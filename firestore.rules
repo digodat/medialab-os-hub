@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// The app accesses Firestore exclusively from the server via Application
+// Default Credentials (@google-cloud/firestore), which bypass these rules.
+// Direct client SDK access is not used, so we deny everything by default.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

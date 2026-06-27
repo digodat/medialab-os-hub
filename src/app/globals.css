@@ -1,26 +1,406 @@
 @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@import "tw-animate-css";
 
 @theme inline {
+  --color-brand: var(--brand);
+  --color-brand-subtle: var(--brand-subtle);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-quicksand), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  --font-heading: var(--font-helvetica-monks), var(--font-quicksand), sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --brand: #2a0c97;
+  --brand-subtle: #e9e3f9;
+  --app-background: #f5f7f5;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(0.985 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: var(--brand);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.88 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: var(--brand);
+  --radius: 1rem;
+  --chart-1: oklch(0.52 0.18 255);
+  --chart-2: oklch(0.52 0.16 162);
+  --chart-3: oklch(0.58 0.17 85);
+  --chart-4: oklch(0.55 0.22 22);
+  --chart-5: oklch(0.52 0.18 310);
+  --sidebar: oklch(0.97 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.94 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.88 0 0);
+  --sidebar-ring: var(--brand);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    font-size: 17px;
+    min-height: 100%;
+    background-color: var(--app-background);
+    /* Keep the vertical scrollbar track always present so it never toggles
+       when content height changes (e.g. filtering). Combined with
+       scrollbar-gutter this prevents horizontal layout shift across browsers,
+       including when section content is centered. */
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+  }
+  body {
+    @apply text-foreground;
+    min-height: 100dvh;
+    background-color: var(--app-background);
+  }
+  /* Grain overlay — fixed layer above everything, non-interactive */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    pointer-events: none;
+    opacity: 0.32;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 200px 200px;
+    mix-blend-mode: multiply;
   }
 }
 
-body {
-  background: var(--background);
+@layer utilities {
+  /* Section titles: HelveticaNowforMonks, lowercase then capitalized */
+  .section-title {
+    font-family: var(--font-heading);
+    text-transform: lowercase;
+    opacity: 0.7;
+  }
+  .section-title::first-letter {
+    text-transform: uppercase;
+  }
+
+  .metric-glass-card {
+    background: rgb(255 255 255 / 0.42);
+    border: 1px solid rgb(255 255 255 / 0.72);
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.45) inset,
+      0 18px 44px -32px rgb(15 23 42 / 0.1);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .glass-card {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background:
+      linear-gradient(
+        135deg,
+        rgb(255 255 255 / 0.5) 0%,
+        rgb(255 255 255 / 0.24) 48%,
+        rgb(255 255 255 / 0.38) 100%
+      );
+    border: 1px solid rgb(255 255 255 / 0.62);
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.82) inset,
+      0 -1px 0 rgb(255 255 255 / 0.28) inset,
+      0 24px 60px -38px rgb(15 23 42 / 0.28);
+    backdrop-filter: blur(24px) saturate(1.35);
+    -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  }
+
+  .glass-card::before,
+  .glass-card::after {
+    position: absolute;
+    pointer-events: none;
+    content: "";
+    z-index: 0;
+  }
+
+  .glass-card > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .glass-card::before {
+    inset: 0;
+    background:
+      linear-gradient(
+        180deg,
+        rgb(255 255 255 / 0.34) 0%,
+        rgb(255 255 255 / 0.12) 32%,
+        transparent 58%
+      );
+  }
+
+  .glass-card::after {
+    top: -46%;
+    left: -18%;
+    width: 76%;
+    height: 170%;
+    transform: rotate(20deg);
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(255 255 255 / 0.14) 46%,
+      transparent 100%
+    );
+  }
+
+  .glass-card:hover {
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.86) inset,
+      0 -1px 0 rgb(255 255 255 / 0.3) inset,
+      0 30px 72px -40px rgb(15 23 42 / 0.36);
+  }
+
+  @supports not (
+    (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+  ) {
+    .glass-card {
+      background: rgb(255 255 255 / 0.58);
+    }
+  }
+}
+
+/* Architecture diagram: strip React Flow's default group-node chrome.
+   We render a fully custom (dashed) group box, so the library's default
+   solid border/background/padding only shows up as an unwanted frame. */
+.arch-flow .react-flow__node-group {
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+}
+
+/* Architecture diagram: focus the selected node by blurring everything else */
+.arch-flow .react-flow__node,
+.arch-flow .react-flow__edges,
+.arch-flow .react-flow__background {
+  transition:
+    filter 0.25s ease,
+    opacity 0.25s ease;
+}
+.arch-flow:has(.react-flow__node.selected) .react-flow__node:not(.selected),
+.arch-flow:has(.react-flow__node.selected) .react-flow__edges,
+.arch-flow:has(.react-flow__node.selected) .react-flow__background {
+  filter: blur(3px);
+  opacity: 0.45;
+}
+
+/* Transitions.dev — Success check.
+   Reusable appear animation for success states. Wrap any icon in
+   .t-success-check and toggle data-state from "out" to "in". The wrapper
+   drives fade + rotate + blur + Y-bob; SVG <path> children get a stroke-draw.
+   Use via the <SuccessCheck /> component (src/components/ui/success-check.tsx),
+   which measures each path length at runtime so the draw works for any icon. */
+.t-success-check {
+  --check-opacity-dur: 500ms;
+  --check-rotate-dur: 500ms;
+  --check-rotate-from: 80deg;
+  --check-bob-dur: 500ms;
+  --check-y-amount: 40px;
+  --check-blur-dur: 500ms;
+  --check-blur-from: 10px;
+  --check-path-dur: 500ms;
+  --check-path-delay: 80ms;
+  --check-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --check-ease-opacity: cubic-bezier(0.22, 1, 0.36, 1);
+  --check-ease-rotate: cubic-bezier(0.22, 1, 0.36, 1);
+  --check-ease-bob: cubic-bezier(0.34, 1.35, 0.64, 1);
+  --check-ease-path: cubic-bezier(0.22, 1, 0.36, 1);
+
+  display: inline-block;
+  transform-origin: center;
+  opacity: 0;
+  will-change: transform, opacity, filter;
+}
+/* overflow: visible keeps the stroke from clipping while it draws;
+   display: block kills the inline whitespace under SVGs. */
+.t-success-check svg {
+  display: block;
+  overflow: visible;
+}
+
+.t-success-check[data-state="in"] {
+  animation:
+    t-check-fade var(--check-opacity-dur) var(--check-ease-opacity) forwards,
+    t-check-rotate var(--check-rotate-dur) var(--check-ease-rotate) forwards,
+    t-check-blur var(--check-blur-dur) var(--check-ease-out) forwards,
+    t-check-bob var(--check-bob-dur) var(--check-ease-bob) forwards;
+}
+.t-success-check[data-state="in"] svg path {
+  animation: t-check-draw var(--check-path-dur) var(--check-ease-path)
+    var(--check-path-delay, 0ms) forwards;
+}
+
+@keyframes t-check-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes t-check-rotate {
+  from {
+    transform: rotate(var(--check-rotate-from));
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+@keyframes t-check-blur {
+  from {
+    filter: blur(var(--check-blur-from));
+  }
+  to {
+    filter: blur(0);
+  }
+}
+@keyframes t-check-bob {
+  from {
+    translate: 0 var(--check-y-amount);
+  }
+  to {
+    translate: 0 0;
+  }
+}
+@keyframes t-check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-success-check {
+    animation: none !important;
+    opacity: 1;
+  }
+  .t-success-check svg path {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+}
+
+/* Transitions.dev — Input clear with dissolve.
+   When an input is cleared, its text dissolves per word (fade + blur + upward
+   fly) with a stagger, instead of vanishing instantly. Adapted from the p13
+   prototype on transitions.dev. The wrapper carries data-clearing; a mirror
+   overlay renders the words while the real input text is hidden. */
+.t-input-dissolve {
+  --word-out-dur: 400ms;
+  --word-out-fly: 12px;
+  --word-out-blur: 2px;
+  --word-stagger: 55ms;
+  --word-out-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.t-input-dissolve__mirror {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding-left: 2.5rem;
+  padding-right: 2.5rem;
+  white-space: pre;
+  overflow: hidden;
+  pointer-events: none;
+  font-size: 0.875rem;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  z-index: 1;
+}
+.t-input-dissolve__word {
+  display: inline-block;
+  will-change: transform, opacity, filter;
+}
+.t-input-dissolve[data-clearing="true"] .t-input-dissolve__word {
+  animation: t-input-word-out var(--word-out-dur) var(--word-out-ease)
+    calc(var(--word-index, 0) * var(--word-stagger)) both;
+}
+
+@keyframes t-input-word-out {
+  from {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    filter: blur(var(--word-out-blur));
+    transform: translateY(calc(var(--word-out-fly) * -1));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-input-dissolve[data-clearing="true"] .t-input-dissolve__word {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(0 0 0 / 15%);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0 0 0 / 25%);
 }
