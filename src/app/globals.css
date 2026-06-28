@@ -224,6 +224,14 @@
   padding: 0;
 }
 
+/* Edges always render behind nodes so lines never paint over button text */
+.arch-flow .react-flow__edges {
+  z-index: 0;
+}
+.arch-flow .react-flow__nodes {
+  z-index: 1;
+}
+
 /* Architecture diagram: focus the selected node by blurring everything else */
 .arch-flow .react-flow__node,
 .arch-flow .react-flow__edges,

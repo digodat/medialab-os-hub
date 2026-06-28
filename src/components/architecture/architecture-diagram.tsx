@@ -211,7 +211,7 @@ function StorageNode({
   return (
     <div
       className={cn(
-        "flex h-full w-full flex-col gap-2 rounded-xl border border-foreground/10 bg-white/70 p-3 shadow-sm backdrop-blur-sm transition-all duration-150",
+        "flex h-full w-full items-center gap-2 rounded-xl border border-foreground/10 bg-white/70 px-3 py-2 shadow-sm backdrop-blur-sm transition-all duration-150",
         "hover:border-brand/40 hover:shadow-md",
         selected && "border-brand ring-2 ring-brand/30",
       )}
@@ -230,23 +230,12 @@ function StorageNode({
           rationale={d.rationale}
         />
       </NodeToolbar>
-      <div className="flex items-center gap-2">
-        {d.logo ? (
-          <img src={d.logo} alt="" className="h-5 w-auto shrink-0 object-contain" />
-        ) : null}
-        <p className="text-[11px] font-semibold leading-tight tracking-tight text-foreground">
-          {d.title}
-        </p>
-      </div>
-      <div className="mt-auto space-y-1.5">
-        {[0, 1, 2].map((i) => (
-          <div
-            key={i}
-            className="h-2.5 rounded-full bg-brand/70"
-            style={{ width: `${88 - i * 6}%` }}
-          />
-        ))}
-      </div>
+      {d.logo ? (
+        <img src={d.logo} alt="" className="h-5 w-auto shrink-0 object-contain" />
+      ) : null}
+      <p className="text-[11px] font-semibold leading-tight tracking-tight text-foreground">
+        {d.title}
+      </p>
     </div>
   );
 }
@@ -665,7 +654,7 @@ const NODES: Node[] = [
       rationale:
         "Para archivos y documentos lo elegimos antes que guardarlos en la base: es más barato por GB, escala sin límite y sirve los objetos directamente. Evita inflar Cloud SQL con blobs binarios.",
     },
-    style: boxStyle(156, 120),
+    style: boxStyle(156, 50),
   },
 
   // Lower band — shared services
@@ -746,6 +735,7 @@ function edge(
   target: string,
   targetHandle: string,
   animated = false,
+  type: "smoothstep" | "straight" = "smoothstep",
 ): Edge {
   return {
     id,
@@ -753,12 +743,13 @@ function edge(
     target,
     sourceHandle,
     targetHandle,
-    type: "smoothstep",
+    type,
     animated,
     markerEnd: marker,
     style: baseStyle,
-    // pathOptions is specific to the built-in smoothstep edge (rounder corners)
-    pathOptions: { borderRadius: 24 },
+    ...(type === "smoothstep"
+      ? { pathOptions: { borderRadius: 24 } }
+      : {}),
   } as Edge;
 }
 
@@ -772,10 +763,13 @@ const EDGES: Edge[] = [
   // doesn't cross the "Envío de campañas" node directly below it nor merge with
   // the edges leaving that node's bottom.
   edge("e5", "logica_alertas", "left-s", "ext_msg", "left-t", true),
-  edge("e6", "envio_campanas", "bottom-s", "ext_ads", "left-t", true),
-  // UI -> shared services
-  edge("e7", "envio_campanas", "bottom-s", "service_account", "top-t"),
-  edge("e8", "service_account", "left-s", "secret_manager", "right-t"),
+  // Exits right and drops down the open corridor between the UI and SQL lanes,
+  // then runs along the bottom into the platforms' right side.
+  edge("e6", "envio_campanas", "right-s", "ext_ads", "right-t", true),
+  // UI -> shared services. Same right-side corridor avoids crossing Notificaciones
+  // directly below "Envío de campañas".
+  edge("e7", "envio_campanas", "right-s", "service_account", "top-t"),
+  edge("e8", "service_account", "left-s", "secret_manager", "right-t", false, "straight"),
   edge("e9", "service_account", "top-s", "fn_oss", "left-t"),
   // Cloud Functions (lane C) -> tables (lane B), leftward
   edge("e11", "fn_oss", "left-s", "tbl_camp_oss", "right-t", true),
@@ -783,8 +777,10 @@ const EDGES: Edge[] = [
   // Cloud Functions -> sources / sinks (lane D), rightward
   edge("e10", "fn_oss", "right-s", "oss_api", "left-t", true),
   edge("e14", "fn_docs", "right-s", "gcs", "left-t", true),
-  // Cloud Functions performance -> ad platforms (downward)
-  edge("e13", "fn_perf", "bottom-s", "ext_ads", "top-t", true),
+  // Cloud Functions performance -> ad platforms. Routed around the right (empty
+  // space between the functions and GCS) so it doesn't cross Service Account,
+  // which sits directly above the platforms' top edge.
+  edge("e13", "fn_perf", "right-s", "ext_ads", "right-t", true),
   // Scheduler triggers functions (downward)
   edge("e15", "cloud_scheduler", "bottom-s", "fn_oss", "top-t"),
 ];
