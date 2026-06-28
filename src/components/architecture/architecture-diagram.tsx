@@ -112,6 +112,12 @@ function NodeHandles() {
           <Handle id={`${side}-t`} type="target" position={side} className={handleClass} />
         </Fragment>
       ))}
+      {/* Offset right-side handles to fan out edges that would otherwise stack on
+          the centered handle (e.g. three connections on "Envío de campañas"). */}
+      <Handle id="right-s-hi" type="source" position={Position.Right} className={handleClass} style={{ top: "25%" }} />
+      <Handle id="right-t-hi" type="target" position={Position.Right} className={handleClass} style={{ top: "25%" }} />
+      <Handle id="right-s-lo" type="source" position={Position.Right} className={handleClass} style={{ top: "75%" }} />
+      <Handle id="right-t-lo" type="target" position={Position.Right} className={handleClass} style={{ top: "75%" }} />
     </>
   );
 }
@@ -758,16 +764,18 @@ const EDGES: Edge[] = [
   edge("e1", "sso_iap", "right-s", "tbl_usuarios", "left-t"),
   edge("e2", "logs_actividades", "right-s", "tbl_actividades", "left-t", true),
   edge("e3", "logica_alertas", "right-s", "tbl_alertas", "left-t", true),
-  edge("e4", "tbl_camp_oss", "left-s", "envio_campanas", "right-t"),
+  // Enters the upper-right of "Envío de campañas" so it doesn't stack with the
+  // two edges leaving that node's right side (e6, e7).
+  edge("e4", "tbl_camp_oss", "left-s", "envio_campanas", "right-t-hi"),
   // UI -> outputs (lower-left). Exits left and runs down the left side so it
   // doesn't cross the "Envío de campañas" node directly below it nor merge with
   // the edges leaving that node's bottom.
   edge("e5", "logica_alertas", "left-s", "ext_msg", "left-t", true),
-  // Exits right and drops down the open corridor between the UI and SQL lanes,
-  // then runs along the bottom into the platforms' right side.
-  edge("e6", "envio_campanas", "right-s", "ext_ads", "right-t", true),
-  // UI -> shared services. Same right-side corridor avoids crossing Notificaciones
-  // directly below "Envío de campañas".
+  // Exits the lower-right and drops down the open corridor between the UI and SQL
+  // lanes, then runs along the bottom into the platforms' right side.
+  edge("e6", "envio_campanas", "right-s-lo", "ext_ads", "right-t", true),
+  // UI -> shared services. Leaves the right-center, distinct from e4 (upper) and
+  // e6 (lower), avoiding crossing Notificaciones directly below "Envío".
   edge("e7", "envio_campanas", "right-s", "service_account", "top-t"),
   edge("e8", "service_account", "left-s", "secret_manager", "right-t", false, "straight"),
   edge("e9", "service_account", "top-s", "fn_oss", "left-t"),
