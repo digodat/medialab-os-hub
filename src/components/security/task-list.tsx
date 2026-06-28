@@ -10,6 +10,8 @@ import {
   useTransition,
 } from "react";
 import {
+  ArrowRightIcon,
+  ChatBubbleLeftEllipsisIcon,
   ChevronRightIcon,
   MagnifyingGlassIcon,
   PencilSquareIcon,
@@ -36,6 +38,7 @@ import {
   type SecurityFindingRecord,
   type Severity,
   type TaskStatus,
+  annotateSecurityHistory,
   formatDisplayDate,
   getDefaultStatusForSeverity,
   getLatestHistoryEntry,
@@ -65,6 +68,7 @@ type PendingChange = {
   findingId: string;
   findingTitle: string;
   status: TaskStatus;
+  previousStatus: TaskStatus;
   mode: "status" | "note";
 };
 
@@ -166,6 +170,28 @@ function HighlightText({
         ),
       )}
     </>
+  );
+}
+
+function StatusPill({
+  status,
+  regex,
+  muted = false,
+}: {
+  status: TaskStatus;
+  regex: RegExp | null;
+  muted?: boolean;
+}) {
+  const style = STATUS_STYLES[status];
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-semibold ${style.bg} ${style.text} ${
+        muted ? "opacity-60" : ""
+      }`}
+    >
+      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`} />
+      <HighlightText text={status} regex={regex} />
+    </span>
   );
 }
 
@@ -394,16 +420,19 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
       findingId: finding.id,
       findingTitle: finding.title,
       status: nextStatus,
+      previousStatus: getRecordStatus(finding, records),
       mode: "status",
     });
   };
 
   const openNoteChange = (finding: NumberedSecurityFinding) => {
     setModalError(null);
+    const currentStatus = getRecordStatus(finding, records);
     setPendingChange({
       findingId: finding.id,
       findingTitle: finding.title,
-      status: getRecordStatus(finding, records),
+      status: currentStatus,
+      previousStatus: currentStatus,
       mode: "note",
     });
   };
@@ -428,11 +457,13 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
       return;
     }
 
-    const { findingId, status } = pendingChange;
+    const { findingId, status, previousStatus, mode } = pendingChange;
     const previousRecord = records[findingId];
     const optimisticEntry = {
       id: `optimistic-${crypto.randomUUID()}`,
       status,
+      previousStatus,
+      kind: mode,
       reason: reason.trim(),
       author: "Guardando...",
       date,
@@ -461,6 +492,7 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
         status,
         reason,
         date,
+        mode,
       });
 
       if (!result.success) {
@@ -579,108 +611,52 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
   return (
     <>
       <div className="space-y-4">
-        <div className="flex flex-wrap justify-end items-center gap-4">
-          <button
-            type="button"
-            onClick={openCreateFinding}
-            className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-          >
-            <PlusIcon className="h-4 w-4" />
-            Agregar hallazgo
-          </button>
-          <div
-            className="t-input-dissolve relative w-full sm:w-64"
-            data-clearing={isClearing ? "true" : "false"}
-          >
-            <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 z-[2] h-4 w-4 -translate-y-1/2 text-foreground/35" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar..."
-              className={`relative z-[2] w-full rounded-full border border-foreground/10 bg-white/50 py-2.5 pl-10 pr-10 text-sm text-foreground placeholder:text-foreground/35 outline-none transition-colors focus:border-brand ${
-                isClearing
-                  ? "[-webkit-text-fill-color:transparent] caret-transparent"
-                  : ""
-              }`}
-            />
-            {isClearing && (
-              <div className="t-input-dissolve__mirror" aria-hidden="true">
-                {renderDissolveTokens(query)}
-              </div>
-            )}
-            {query && (
-              <button
-                type="button"
-                onClick={handleClearSearch}
-                aria-label="Limpiar búsqueda"
-                className="absolute right-3 top-1/2 z-[3] -translate-y-1/2 rounded-full p-1 text-foreground/35 transition-colors hover:bg-foreground/5 hover:text-foreground"
-              >
-                <XMarkIcon className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <h3 className="section-title text-base font-semibold tracking-tight text-foreground">
             Tareas
-            {isFiltering && (
-              <span className="ml-2 font-mono text-xs font-normal text-foreground/40">
-                {resultCount} {resultCount === 1 ? "resultado" : "resultados"}
-              </span>
-            )}
           </h3>
-          <div className="flex flex-wrap items-center gap-2">
-            {counts.map(({ severity, count }) => {
-              const isActive = severityFilter === severity;
-              return (
-                <button
-                  key={severity}
-                  type="button"
-                  aria-pressed={isActive}
-                  onClick={() => toggleSeverity(severity)}
-                  className={`px-2 py-0.5 rounded-full text-[11px] font-bold transition-all ${SEVERITY_STYLES[severity]} ${
-                    isActive
-                      ? "ring-2 ring-current ring-offset-1 ring-offset-[var(--app-background)]"
-                      : severityFilter !== null
-                        ? "opacity-45 hover:opacity-100"
-                        : "hover:opacity-80"
-                  }`}
-                >
-                  {count} {severity}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground/35">
-            Estado
-          </span>
-          {statusCounts.map(({ status, count }) => {
-            const isActive = statusFilter === status;
-            const style = STATUS_STYLES[status];
-            return (
-              <button
-                key={status}
-                type="button"
-                aria-pressed={isActive}
-                onClick={() => toggleStatus(status)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all ${style.bg} ${style.text} ${
-                  isActive
-                    ? "ring-2 ring-current ring-offset-1 ring-offset-[var(--app-background)]"
-                    : statusFilter !== null
-                      ? "opacity-45 hover:opacity-100"
-                      : "hover:opacity-80"
+          <div className="flex flex-wrap items-center gap-4">
+            <button
+              type="button"
+              onClick={openCreateFinding}
+              className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              <PlusIcon className="h-4 w-4" />
+              Agregar tarea
+            </button>
+            <div
+              className="t-input-dissolve relative w-full sm:w-64"
+              data-clearing={isClearing ? "true" : "false"}
+            >
+              <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 z-[2] h-4 w-4 -translate-y-1/2 text-foreground/35" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar..."
+                className={`relative z-[2] w-full rounded-full border border-foreground/10 bg-white/50 py-2.5 pl-10 pr-10 text-sm text-foreground placeholder:text-foreground/35 outline-none transition-colors focus:border-brand ${
+                  isClearing
+                    ? "[-webkit-text-fill-color:transparent] caret-transparent"
+                    : ""
                 }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} />
-                {count} {status}
-              </button>
-            );
-          })}
+              />
+              {isClearing && (
+                <div className="t-input-dissolve__mirror" aria-hidden="true">
+                  {renderDissolveTokens(query)}
+                </div>
+              )}
+              {query && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  aria-label="Limpiar búsqueda"
+                  className="absolute right-3 top-1/2 z-[3] -translate-y-1/2 rounded-full p-1 text-foreground/35 transition-colors hover:bg-foreground/5 hover:text-foreground"
+                >
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="bg-white/50 backdrop-blur-sm border border-foreground/10 rounded-xl p-4">
@@ -710,6 +686,68 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
             />
           </div>
         </div>
+
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="w-20 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-foreground/35">
+              Estado
+            </span>
+            {statusCounts.map(({ status, count }) => {
+              const isActive = statusFilter === status;
+              const style = STATUS_STYLES[status];
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => toggleStatus(status)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all ${style.bg} ${style.text} ${
+                    isActive
+                      ? "ring-2 ring-current ring-offset-1 ring-offset-[var(--app-background)]"
+                      : statusFilter !== null
+                        ? "opacity-45 hover:opacity-100"
+                        : "hover:opacity-80"
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} />
+                  {count} {status}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="w-20 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-foreground/35">
+              Severidad
+            </span>
+            {counts.map(({ severity, count }) => {
+              const isActive = severityFilter === severity;
+              return (
+                <button
+                  key={severity}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => toggleSeverity(severity)}
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all ${SEVERITY_STYLES[severity]} ${
+                    isActive
+                      ? "ring-2 ring-current ring-offset-1 ring-offset-[var(--app-background)]"
+                      : severityFilter !== null
+                        ? "opacity-45 hover:opacity-100"
+                        : "hover:opacity-80"
+                  }`}
+                >
+                  {count} {severity}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {isFiltering && (
+          <p className="text-right font-mono text-xs text-foreground/40">
+            {resultCount} {resultCount === 1 ? "resultado" : "resultados"}
+          </p>
+        )}
 
         {isFiltering && resultCount === 0 ? (
           <p className="py-8 text-center text-sm text-foreground/45">
@@ -764,7 +802,10 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
                         const record = records[finding.id];
                         const currentStatus = getRecordStatus(finding, records);
                         const latestEntry = getLatestHistoryEntry(record);
-                        const history = record?.history ?? [];
+                        const annotatedHistory = annotateSecurityHistory(
+                          record?.history ?? [],
+                          finding.severity,
+                        );
 
                         return (
                           <div
@@ -864,48 +905,68 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
                                   />
                                 </p>
 
-                                {history.length > 0 ? (
+                                {annotatedHistory.length > 0 ? (
                                   <div className="space-y-2">
                                     <h6 className="text-[11px] font-semibold uppercase tracking-wide text-foreground/45">
                                       Historial de cambios
                                     </h6>
                                     <div className="space-y-2">
-                                      {[...history].reverse().map((entry) => (
-                                        <div
-                                          key={entry.id}
-                                          className="rounded-xl border border-foreground/8 bg-white/60 px-3 py-2.5"
-                                        >
-                                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-foreground/55">
-                                            <span className="rounded-full bg-foreground/5 px-2 py-0.5 font-semibold text-foreground/70">
+                                      {[...annotatedHistory]
+                                        .reverse()
+                                        .map(({ entry, kind, previousStatus }) => (
+                                          <div
+                                            key={entry.id}
+                                            className="rounded-xl border border-foreground/8 bg-white/60 px-3 py-2.5"
+                                          >
+                                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-foreground/55">
+                                              {kind === "note" ? (
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-foreground/5 px-2 py-0.5 font-semibold text-foreground/60">
+                                                  <ChatBubbleLeftEllipsisIcon className="h-3 w-3" />
+                                                  Comentario
+                                                </span>
+                                              ) : (
+                                                <span className="inline-flex items-center gap-1.5">
+                                                  <StatusPill
+                                                    status={previousStatus}
+                                                    regex={highlightRegex}
+                                                    muted
+                                                  />
+                                                  <ArrowRightIcon className="h-3 w-3 shrink-0 text-foreground/35" />
+                                                  <StatusPill
+                                                    status={entry.status}
+                                                    regex={highlightRegex}
+                                                  />
+                                                </span>
+                                              )}
+                                              <span className="text-foreground/30">
+                                                ·
+                                              </span>
+                                              <span>
+                                                <HighlightText
+                                                  text={entry.author}
+                                                  regex={highlightRegex}
+                                                />
+                                              </span>
+                                              <span className="text-foreground/30">
+                                                ·
+                                              </span>
+                                              <span>
+                                                <HighlightText
+                                                  text={formatDisplayDate(
+                                                    entry.date,
+                                                  )}
+                                                  regex={highlightRegex}
+                                                />
+                                              </span>
+                                            </div>
+                                            <p className="mt-1.5 text-xs leading-relaxed text-foreground/65">
                                               <HighlightText
-                                                text={entry.status}
+                                                text={entry.reason}
                                                 regex={highlightRegex}
                                               />
-                                            </span>
-                                            <span>
-                                              <HighlightText
-                                                text={entry.author}
-                                                regex={highlightRegex}
-                                              />
-                                            </span>
-                                            <span>·</span>
-                                            <span>
-                                              <HighlightText
-                                                text={formatDisplayDate(
-                                                  entry.date,
-                                                )}
-                                                regex={highlightRegex}
-                                              />
-                                            </span>
+                                            </p>
                                           </div>
-                                          <p className="mt-1.5 text-xs leading-relaxed text-foreground/65">
-                                            <HighlightText
-                                              text={entry.reason}
-                                              regex={highlightRegex}
-                                            />
-                                          </p>
-                                        </div>
-                                      ))}
+                                        ))}
                                     </div>
                                   </div>
                                 ) : null}

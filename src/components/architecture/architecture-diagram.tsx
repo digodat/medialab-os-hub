@@ -29,6 +29,7 @@ import {
   CloudIcon,
   DocumentTextIcon,
   PaperAirplaneIcon,
+  ServerStackIcon,
   TableCellsIcon,
 } from "@heroicons/react/24/outline";
 import type { ComponentType, MouseEvent as ReactMouseEvent, SVGProps } from "react";
@@ -125,8 +126,12 @@ function NodeHandles() {
           the same point as another edge's incoming arrow (e.g. "Service Account"). */}
       <Handle id="top-s-r" type="source" position={Position.Top} className={handleClass} style={{ left: "72%" }} />
       <Handle id="top-t-r" type="target" position={Position.Top} className={handleClass} style={{ left: "72%" }} />
-      {/* Offset bottom-side handle to separate two edges dropping out the bottom. */}
-      <Handle id="bottom-s-r" type="source" position={Position.Bottom} className={handleClass} style={{ left: "68%" }} />
+      {/* Offset left-side handles to separate an incoming arrow from an outgoing
+          edge that would otherwise stack on the left-center (e.g. "Extracción OSS Data"). */}
+      <Handle id="left-s-hi" type="source" position={Position.Left} className={handleClass} style={{ top: "28%" }} />
+      <Handle id="left-t-hi" type="target" position={Position.Left} className={handleClass} style={{ top: "28%" }} />
+      <Handle id="left-s-lo" type="source" position={Position.Left} className={handleClass} style={{ top: "72%" }} />
+      <Handle id="left-t-lo" type="target" position={Position.Left} className={handleClass} style={{ top: "72%" }} />
     </>
   );
 }
@@ -406,7 +411,7 @@ const NODES: Node[] = [
     data: {},
     draggable: false,
     selectable: false,
-    style: groupStyle(272, 255),
+    style: groupStyle(272, 305),
   },
   {
     id: "g_sql",
@@ -515,6 +520,18 @@ const NODES: Node[] = [
         "Publica campañas hacia Google Ads, Meta y TikTok usando la Service Account.",
     },
     style: boxStyle(228, 44),
+  },
+  {
+    id: "backend",
+    type: "service",
+    position: { x: 62, y: 370 },
+    data: {
+      title: "Captura de Datos",
+      Icon: ServerStackIcon,
+      description:
+        "Capa de captura de datos del backend. Orquesta la lógica de negocio y se autentica ante los servicios de GCP mediante la Service Account.",
+    },
+    style: boxStyle(228, 40),
   },
 
   // Lane B — Cloud SQL tables
@@ -801,15 +818,19 @@ function ChannelEdge(props: EdgeProps) {
 
 const edgeTypes = { channel: ChannelEdge };
 
+// Direction encodes the visual style:
+//  - "uni": one-way flow -> dashed + animated line, origin dot + end arrow.
+//  - "bi":  two-way flow  -> solid (no animation) line, arrowheads on both ends.
 function edge(
   id: string,
   source: string,
   sourceHandle: string,
   target: string,
   targetHandle: string,
-  animated = false,
+  dir: "uni" | "bi" = "uni",
   type: "smoothstep" | "straight" = "smoothstep",
 ): Edge {
+  const bi = dir === "bi";
   return {
     id,
     source,
@@ -817,8 +838,8 @@ function edge(
     sourceHandle,
     targetHandle,
     type,
-    animated,
-    markerStart: dotMarker,
+    animated: !bi,
+    markerStart: bi ? marker : dotMarker,
     markerEnd: marker,
     style: baseStyle,
     ...(type === "smoothstep"
@@ -829,63 +850,78 @@ function edge(
 
 const EDGES: Edge[] = [
   // UI (lane A) <-> Cloud SQL (lane B): short, mostly horizontal
-  edge("e1", "sso_iap", "right-s", "tbl_usuarios", "left-t"),
-  edge("e2", "logs_actividades", "right-s", "tbl_actividades", "left-t", true),
-  edge("e3", "logica_alertas", "right-s", "tbl_alertas", "left-t", true),
-  // Enters the upper-right of "Envío de campañas" so it doesn't stack with the
-  // two edges leaving that node's right side (e6, e7).
-  edge("e4", "tbl_camp_oss", "left-s", "envio_campanas", "right-t-hi"),
-  // UI -> outputs (lower-left). Exits left and runs down the left side so it
-  // doesn't cross the "Envío de campañas" node directly below it nor merge with
-  // the edges leaving that node's bottom.
-  edge("e5", "logica_alertas", "left-s", "ext_msg", "left-t", true),
-  // Both leave the bottom of "Envío de campañas" and route their horizontal run
-  // through the clear band between the table/function rows (end ~y388) and the
-  // lower node row (start ~y450), so they never pass behind a node.
+  edge("e1", "sso_iap", "right-s", "tbl_usuarios", "left-t", "bi"),
+  edge("e2", "logs_actividades", "right-s", "tbl_actividades", "left-t", "uni"),
+  edge("e3", "logica_alertas", "right-s", "tbl_alertas", "left-t", "bi"),
+  // Tabla campañas OSS <-> Manejo de Rutas. Routed down the inter-group corridor
+  // (x ~358, separate from e6 at ~340) and into the right side of "Manejo de Rutas".
   {
-    id: "e7",
-    source: "envio_campanas",
-    sourceHandle: "bottom-s",
-    target: "service_account",
-    targetHandle: "top-t",
+    id: "e4",
+    source: "tbl_camp_oss",
+    sourceHandle: "left-s",
+    target: "backend",
+    targetHandle: "right-t",
     type: "channel",
-    data: { centerY: 410 },
-    markerStart: dotMarker,
+    data: { centerX: 358 },
+    markerStart: marker,
     markerEnd: marker,
     style: baseStyle,
   } as Edge,
+  // UI -> outputs (lower-left). Exits left and runs down the left side so it
+  // doesn't cross the "Envío de campañas" node directly below it nor merge with
+  // the edges leaving that node's bottom.
+  edge("e5", "logica_alertas", "left-s", "ext_msg", "left-t", "uni"),
+  // Exits the right of "Envío de campañas" and drops down the clear corridor
+  // between the UI and SQL groups (x ~340), then runs along the bottom into the
+  // platforms' left side. Routed on the right because "Backend" now sits directly
+  // below "Envío", blocking the bottom exit.
   {
     id: "e6",
     source: "envio_campanas",
-    sourceHandle: "bottom-s-r",
+    sourceHandle: "right-s-lo",
     target: "ext_ads",
     targetHandle: "left-t",
     type: "channel",
     animated: true,
-    // Drops down the clear corridor between Notificaciones and Secret Manager
-    // (x ~388), runs along the bottom and enters the platforms from the left.
-    data: { centerY: 432, centerX: 388 },
+    data: { centerX: 340 },
     markerStart: dotMarker,
     markerEnd: marker,
     style: baseStyle,
   } as Edge,
-  edge("e8", "service_account", "left-s", "secret_manager", "right-t", false, "straight"),
+  // Service Account -> Captura de Datos: leaves the top of Service Account, runs up
+  // through the clear band below the UI group and into the bottom of Captura de Datos.
+  {
+    id: "e16",
+    source: "service_account",
+    sourceHandle: "top-s",
+    target: "backend",
+    targetHandle: "bottom-t",
+    type: "channel",
+    animated: true,
+    data: { centerY: 435 },
+    markerStart: dotMarker,
+    markerEnd: marker,
+    style: baseStyle,
+  } as Edge,
+  edge("e8", "service_account", "left-s", "secret_manager", "right-t", "bi", "straight"),
   // Leaves the top-right of Service Account so its origin dot doesn't sit on the
-  // same point where e7's arrow enters the top-center.
-  edge("e9", "service_account", "top-s-r", "fn_oss", "left-t"),
-  // Cloud Functions (lane C) -> tables (lane B), leftward
-  edge("e11", "fn_oss", "left-s", "tbl_camp_oss", "right-t", true),
-  edge("e12", "fn_perf", "left-s", "tbl_camp_plat", "right-t", true),
+  // same point where e7's arrow enters the top-center. Enters fn_oss on the lower
+  // half of its left side, separate from e11 which leaves the upper half.
+  edge("e9", "service_account", "top-s-r", "fn_oss", "left-t-lo", "bi"),
+  // Cloud Functions (lane C) -> tables (lane B), leftward. Leaves the upper half
+  // of fn_oss's left side so its origin dot doesn't stack with e9's arrow.
+  edge("e11", "fn_oss", "left-s-hi", "tbl_camp_oss", "right-t", "uni"),
+  edge("e12", "fn_perf", "left-s", "tbl_camp_plat", "right-t", "uni"),
   // Cloud Functions -> sources / sinks (lane D), rightward
-  edge("e10", "fn_oss", "right-s", "oss_api", "left-t", true),
-  edge("e14", "fn_docs", "right-s", "gcs", "left-t", true),
+  edge("e10", "fn_oss", "right-s", "oss_api", "left-t", "uni"),
+  edge("e14", "fn_docs", "right-s", "gcs", "left-t", "bi"),
   // Cloud Functions performance -> ad platforms. Routed around the right (empty
   // space between the functions and GCS) so it doesn't cross Service Account,
   // which sits directly above the platforms' top edge.
-  edge("e13", "fn_perf", "right-s", "ext_ads", "right-t", true),
+  edge("e13", "fn_perf", "right-s", "ext_ads", "right-t", "uni"),
   // Scheduler triggers functions (downward). Enters the top-right of the function
   // so the bend stays clear of the "CLOUD FUNCTIONS" group label on the left.
-  edge("e15", "cloud_scheduler", "bottom-s", "fn_oss", "top-t-r"),
+  edge("e15", "cloud_scheduler", "bottom-s", "fn_oss", "top-t-r", "uni"),
 ];
 
 const FIT_VIEW_OPTIONS = { padding: 0.12 };

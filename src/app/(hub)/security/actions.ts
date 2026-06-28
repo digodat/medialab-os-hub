@@ -14,6 +14,7 @@ import {
   upsertFinding,
 } from "@/lib/security/security-persistence";
 import {
+  type SecurityChangeKind,
   type SecurityHistoryEntry,
   type Severity,
   type TaskStatus,
@@ -57,6 +58,7 @@ export async function appendSecurityChangeAction(payload: {
   status: TaskStatus;
   reason: string;
   date: string;
+  mode: SecurityChangeKind;
 }): Promise<AppendSecurityChangeResult> {
   const findingId = payload.findingId.trim();
 
@@ -73,6 +75,9 @@ export async function appendSecurityChangeAction(payload: {
       error: "El estado seleccionado no es válido.",
     };
   }
+
+  const kind: SecurityChangeKind =
+    payload.mode === "note" ? "note" : "status";
 
   const reason = payload.reason.trim();
 
@@ -99,6 +104,7 @@ export async function appendSecurityChangeAction(payload: {
       reason,
       date: payload.date,
       author,
+      kind,
     });
 
     return {

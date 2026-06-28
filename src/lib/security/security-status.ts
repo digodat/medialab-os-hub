@@ -7,13 +7,23 @@ export type TaskStatus =
 
 export type Severity = "CRÍTICO" | "ALTO" | "MEDIO" | "BAJO" | "OK";
 
+export type SecurityChangeKind = "status" | "note";
+
 export type SecurityHistoryEntry = {
   id: string;
   status: TaskStatus;
+  previousStatus?: TaskStatus | null;
+  kind?: SecurityChangeKind;
   reason: string;
   author: string;
   date: string;
   createdAt: string;
+};
+
+export type AnnotatedHistoryEntry = {
+  entry: SecurityHistoryEntry;
+  kind: SecurityChangeKind;
+  previousStatus: TaskStatus;
 };
 
 export type SecurityFindingRecord = {
@@ -89,4 +99,25 @@ export function getLatestHistoryEntry(record?: SecurityFindingRecord | null) {
   }
 
   return record.history[record.history.length - 1] ?? null;
+}
+
+// Annotates a chronological history list, resolving for each entry whether it
+// was a status change (with its previous status) or just a comment. Persisted
+// `kind` / `previousStatus` are used when available; otherwise both are derived
+// from the status sequence so legacy entries still render correctly.
+export function annotateSecurityHistory(
+  history: SecurityHistoryEntry[],
+  severity: Severity,
+): AnnotatedHistoryEntry[] {
+  let runningStatus = getDefaultStatusForSeverity(severity);
+
+  return history.map((entry) => {
+    const previousStatus = entry.previousStatus ?? runningStatus;
+    const kind: SecurityChangeKind =
+      entry.kind ?? (entry.status === previousStatus ? "note" : "status");
+
+    runningStatus = entry.status;
+
+    return { entry, kind, previousStatus };
+  });
 }

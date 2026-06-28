@@ -14,6 +14,7 @@ import {
   parseIapEmailHeader,
 } from "@/lib/security/iap-access";
 import {
+  type SecurityChangeKind,
   type SecurityFindingRecord,
   type SecurityHistoryEntry,
   type Severity,
@@ -106,9 +107,17 @@ function sanitizeHistoryEntry(value: unknown): SecurityHistoryEntry | null {
     return null;
   }
 
+  const kind: SecurityChangeKind | undefined =
+    value.kind === "status" || value.kind === "note" ? value.kind : undefined;
+  const previousStatus = isTaskStatus(value.previousStatus)
+    ? value.previousStatus
+    : undefined;
+
   return {
     id: value.id,
     status: value.status,
+    ...(previousStatus ? { previousStatus } : {}),
+    ...(kind ? { kind } : {}),
     reason: value.reason,
     author: value.author,
     date: value.date,
@@ -323,12 +332,14 @@ export async function appendSecurityChange({
   reason,
   date,
   author,
+  kind,
 }: {
   findingId: string;
   status: TaskStatus;
   reason: string;
   date: string;
   author: string;
+  kind: SecurityChangeKind;
 }): Promise<SecurityHistoryEntry> {
   const trimmedFindingId = findingId.trim();
   const trimmedReason = reason.trim();
@@ -355,9 +366,16 @@ export async function appendSecurityChange({
     );
   }
 
+  const data = snapshot.data() ?? {};
+  const previousStatus = isTaskStatus(data.currentStatus)
+    ? data.currentStatus
+    : null;
+
   const entry: SecurityHistoryEntry = {
     id: crypto.randomUUID(),
     status,
+    previousStatus,
+    kind,
     reason: trimmedReason,
     author,
     date,
