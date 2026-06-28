@@ -3,13 +3,22 @@ import "server-only";
 import { FieldValue, Firestore } from "@google-cloud/firestore";
 
 import {
+  type CategoryKey,
+  type NumberedSecurityFinding,
+  type SecurityFinding,
+  isCategoryKey,
+  isSeverity,
+} from "@/lib/security/security-catalog";
+import {
   getDevAuthorEmail,
   parseIapEmailHeader,
 } from "@/lib/security/iap-access";
 import {
   type SecurityFindingRecord,
   type SecurityHistoryEntry,
+  type Severity,
   type TaskStatus,
+  getDefaultStatusForSeverity,
   isTaskStatus,
   isValidHistoryDate,
 } from "@/lib/security/security-status";
@@ -17,6 +26,20 @@ import {
 const SECURITY_FINDINGS_COLLECTION = "security-findings";
 
 let firestoreSingleton: Firestore | null = null;
+
+export type SecurityFindingWithState = {
+  finding: NumberedSecurityFinding;
+  record: SecurityFindingRecord | null;
+};
+
+export type FindingInput = {
+  id: string;
+  code: string;
+  severity: Severity;
+  category: CategoryKey;
+  title: string;
+  detail: string;
+};
 
 export class SecurityPersistenceError extends Error {
   status: number;
@@ -124,24 +147,174 @@ function sanitizeFindingRecord(
   };
 }
 
-export async function getAllSecurityRecords(): Promise<
-  Record<string, SecurityFindingRecord>
+function sanitizeCatalog(
+  findingId: string,
+  value: unknown,
+): SecurityFinding | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  if (
+    typeof value.code !== "string" ||
+    !isSeverity(value.severity) ||
+    !isCategoryKey(value.category) ||
+    typeof value.title !== "string" ||
+    typeof value.detail !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    id: findingId,
+    code: value.code,
+    severity: value.severity,
+    category: value.category,
+    title: value.title,
+    detail: value.detail,
+  };
+}
+
+// Reads the full catalog (metadata) and operational state of every finding.
+// Findings are ordered by their stored `order` field and renumbered
+// sequentially so the displayed `#NN` stays stable and gap-free.
+export async function getAllSecurityFindings(): Promise<
+  SecurityFindingWithState[]
 > {
-  // Any failure to reach Firestore propagates so the page can render an error
-  // state instead of the findings list. An empty collection returns {} via the
-  // normal path (connected, but no data yet).
   const snapshot = await getSecurityFindingsCollection().get();
-  const records: Record<string, SecurityFindingRecord> = {};
+
+  const rows: {
+    order: number;
+    catalog: SecurityFinding;
+    record: SecurityFindingRecord | null;
+  }[] = [];
 
   for (const doc of snapshot.docs) {
-    const record = sanitizeFindingRecord(doc.id, doc.data());
+    const data = doc.data();
+    const catalog = sanitizeCatalog(doc.id, data);
 
-    if (record) {
-      records[doc.id] = record;
+    if (!catalog) {
+      continue;
+    }
+
+    const order =
+      typeof data.order === "number" ? data.order : Number.MAX_SAFE_INTEGER;
+
+    rows.push({
+      order,
+      catalog,
+      record: sanitizeFindingRecord(doc.id, data),
+    });
+  }
+
+  rows.sort(
+    (a, b) => a.order - b.order || a.catalog.code.localeCompare(b.catalog.code),
+  );
+
+  return rows.map((row, index) => ({
+    finding: { ...row.catalog, number: index + 1 },
+    record: row.record,
+  }));
+}
+
+function validateFindingInput(input: FindingInput) {
+  const id = input.id.trim();
+  const code = input.code.trim();
+  const title = input.title.trim();
+  const detail = input.detail.trim();
+
+  if (!id) {
+    throw new SecurityPersistenceError("El identificador es obligatorio.", 400);
+  }
+
+  if (!code) {
+    throw new SecurityPersistenceError("El código es obligatorio.", 400);
+  }
+
+  if (!isSeverity(input.severity)) {
+    throw new SecurityPersistenceError("La severidad no es válida.", 400);
+  }
+
+  if (!isCategoryKey(input.category)) {
+    throw new SecurityPersistenceError("La categoría no es válida.", 400);
+  }
+
+  if (!title) {
+    throw new SecurityPersistenceError("El título es obligatorio.", 400);
+  }
+
+  if (!detail) {
+    throw new SecurityPersistenceError("El detalle es obligatorio.", 400);
+  }
+
+  return { id, code, title, detail };
+}
+
+async function getNextOrder() {
+  const snapshot = await getSecurityFindingsCollection().get();
+  let maxOrder = 0;
+
+  for (const doc of snapshot.docs) {
+    const order = doc.data().order;
+    if (typeof order === "number" && order > maxOrder) {
+      maxOrder = order;
     }
   }
 
-  return records;
+  return maxOrder + 1;
+}
+
+// Creates a new finding or edits the catalog fields of an existing one. Editing
+// never touches the operational state (currentStatus / history).
+export async function upsertFinding(
+  input: FindingInput,
+  isNew: boolean,
+): Promise<void> {
+  const { id, code, title, detail } = validateFindingInput(input);
+  const docRef = getSecurityFindingsCollection().doc(id);
+  const existing = await docRef.get();
+
+  if (isNew) {
+    if (existing.exists) {
+      throw new SecurityPersistenceError(
+        "Ya existe un hallazgo con ese identificador.",
+        409,
+      );
+    }
+
+    await docRef.set({
+      findingId: id,
+      code,
+      severity: input.severity,
+      category: input.category,
+      title,
+      detail,
+      order: await getNextOrder(),
+      currentStatus: getDefaultStatusForSeverity(input.severity),
+      updatedAt: nowIso(),
+      history: [],
+    });
+
+    return;
+  }
+
+  if (!existing.exists) {
+    throw new SecurityPersistenceError(
+      "No encontramos ese hallazgo de seguridad.",
+      404,
+    );
+  }
+
+  await docRef.set(
+    {
+      code,
+      severity: input.severity,
+      category: input.category,
+      title,
+      detail,
+    },
+    { merge: true },
+  );
 }
 
 export async function appendSecurityChange({
@@ -172,6 +345,16 @@ export async function appendSecurityChange({
     throw new SecurityPersistenceError("La fecha no es válida.", 400);
   }
 
+  const docRef = getSecurityFindingsCollection().doc(trimmedFindingId);
+  const snapshot = await docRef.get();
+
+  if (!snapshot.exists) {
+    throw new SecurityPersistenceError(
+      "No encontramos ese hallazgo de seguridad.",
+      404,
+    );
+  }
+
   const entry: SecurityHistoryEntry = {
     id: crypto.randomUUID(),
     status,
@@ -181,17 +364,15 @@ export async function appendSecurityChange({
     createdAt: nowIso(),
   };
 
-  await getSecurityFindingsCollection()
-    .doc(trimmedFindingId)
-    .set(
-      {
-        findingId: trimmedFindingId,
-        currentStatus: status,
-        updatedAt: entry.createdAt,
-        history: FieldValue.arrayUnion(entry),
-      },
-      { merge: true },
-    );
+  await docRef.set(
+    {
+      findingId: trimmedFindingId,
+      currentStatus: status,
+      updatedAt: entry.createdAt,
+      history: FieldValue.arrayUnion(entry),
+    },
+    { merge: true },
+  );
 
   return entry;
 }

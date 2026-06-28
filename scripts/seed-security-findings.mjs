@@ -1,34 +1,25 @@
-import type { Severity } from "@/lib/security/security-status";
+// One-time migration: loads the security findings catalog into Firestore.
+// Idempotent: preserves existing operational state (currentStatus / history)
+// and only refreshes catalog metadata + order. Run with ADC:
+//   SECURITY_FIRESTORE_DATABASE_ID=medialab-os-hub node scripts/seed-security-findings.mjs
 
-export type CategoryKey =
-  | "iam"
-  | "secrets"
-  | "deps"
-  | "platform"
-  | "data"
-  | "ops";
+import { Firestore } from "@google-cloud/firestore";
 
-export type SecurityFinding = {
-  id: string;
-  code: string;
-  severity: Severity;
-  category: CategoryKey;
-  title: string;
-  detail: string;
-};
+const COLLECTION = "security-findings";
 
-export type NumberedSecurityFinding = SecurityFinding & { number: number };
+const databaseId = process.env.SECURITY_FIRESTORE_DATABASE_ID?.trim();
+if (!databaseId) {
+  console.error("Falta SECURITY_FIRESTORE_DATABASE_ID");
+  process.exit(1);
+}
 
-export const SECURITY_CATEGORIES: { key: CategoryKey; name: string }[] = [
-  { key: "iam", name: "Identidad y control de acceso" },
-  { key: "secrets", name: "Gestión de secretos y credenciales" },
-  { key: "deps", name: "Dependencias y cadena de suministro" },
-  { key: "platform", name: "Configuración y hardening de la plataforma" },
-  { key: "data", name: "Validación de entrada y protección de datos" },
-  { key: "ops", name: "Observabilidad, abuso y calidad de código" },
-];
+const db = new Firestore(databaseId === "(default)" ? {} : { databaseId });
 
-export const SECURITY_FINDINGS: SecurityFinding[] = [
+function defaultStatus(severity) {
+  return severity === "OK" ? "No Aplica" : "No comenzada";
+}
+
+const FINDINGS = [
   {
     id: "c1-meta-token",
     code: "C1",
@@ -271,14 +262,46 @@ export const SECURITY_FINDINGS: SecurityFinding[] = [
   },
 ];
 
-let counter = 0;
+async function main() {
+  let created = 0;
+  let updated = 0;
 
-export const NUMBERED_SECURITY_FINDINGS: NumberedSecurityFinding[] =
-  SECURITY_FINDINGS.map((finding) => ({
-    ...finding,
-    number: ++counter,
-  }));
+  for (let i = 0; i < FINDINGS.length; i++) {
+    const finding = FINDINGS[i];
+    const order = i + 1;
+    const docRef = db.collection(COLLECTION).doc(finding.id);
+    const snapshot = await docRef.get();
 
-export const SECURITY_FINDING_BY_ID = new Map(
-  SECURITY_FINDINGS.map((finding) => [finding.id, finding]),
-);
+    const catalog = {
+      findingId: finding.id,
+      code: finding.code,
+      severity: finding.severity,
+      category: finding.category,
+      title: finding.title,
+      detail: finding.detail,
+      order,
+    };
+
+    if (snapshot.exists) {
+      await docRef.set(catalog, { merge: true });
+      updated += 1;
+    } else {
+      await docRef.set({
+        ...catalog,
+        currentStatus: defaultStatus(finding.severity),
+        updatedAt: new Date().toISOString(),
+        history: [],
+      });
+      created += 1;
+    }
+  }
+
+  console.log(
+    `Seed completo. creados=${created} actualizados=${updated} total=${FINDINGS.length} db=${databaseId}`,
+  );
+}
+
+main().catch((error) => {
+  console.error("Seed falló:", error);
+  process.exit(1);
+});

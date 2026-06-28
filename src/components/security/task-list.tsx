@@ -12,18 +12,26 @@ import {
 import {
   ChevronRightIcon,
   MagnifyingGlassIcon,
+  PencilSquareIcon,
+  PlusIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 
-import { appendSecurityChangeAction } from "@/app/(hub)/security/actions";
+import {
+  appendSecurityChangeAction,
+  upsertSecurityFindingAction,
+} from "@/app/(hub)/security/actions";
 import { ChangeModal } from "@/components/security/change-modal";
+import {
+  FindingModal,
+  type FindingFormValues,
+} from "@/components/security/finding-modal";
 import { STATUS_OPTIONS, StatusSelect } from "@/components/security/status-select";
 import {
-  NUMBERED_SECURITY_FINDINGS,
   SECURITY_CATEGORIES,
   type NumberedSecurityFinding,
-} from "@/lib/security/security-findings";
+} from "@/lib/security/security-catalog";
 import {
   type SecurityFindingRecord,
   type Severity,
@@ -61,7 +69,14 @@ type PendingChange = {
 };
 
 type TaskListProps = {
+  findings: NumberedSecurityFinding[];
   initialRecords: Record<string, SecurityFindingRecord>;
+};
+
+type FindingModalState = {
+  mode: "create" | "edit";
+  id?: string;
+  values: FindingFormValues;
 };
 
 function normalize(text: string) {
@@ -189,10 +204,16 @@ function getRecordStatus(
   );
 }
 
-export function TaskList({ initialRecords }: TaskListProps) {
+export function TaskList({ findings, initialRecords }: TaskListProps) {
   const router = useRouter();
   const [records, setRecords] =
     useState<Record<string, SecurityFindingRecord>>(initialRecords);
+  const [findingModal, setFindingModal] = useState<FindingModalState | null>(
+    null,
+  );
+  const [findingError, setFindingError] = useState<string | null>(null);
+  const [findingSuccess, setFindingSuccess] = useState(false);
+  const [isFindingPending, startFindingTransition] = useTransition();
   const [query, setQuery] = useState("");
   const [severityFilter, setSeverityFilter] = useState<Severity | null>(null);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | null>(null);
@@ -257,7 +278,7 @@ export function TaskList({ initialRecords }: TaskListProps) {
 
   const filteredFindings = useMemo(
     () =>
-      NUMBERED_SECURITY_FINDINGS.filter(
+      findings.filter(
         (finding) =>
           (severityFilter === null || finding.severity === severityFilter) &&
           (statusFilter === null ||
@@ -265,7 +286,7 @@ export function TaskList({ initialRecords }: TaskListProps) {
           (!isSearching ||
             matchesFinding(finding, records[finding.id], trimmedQuery)),
       ),
-    [isSearching, trimmedQuery, severityFilter, statusFilter, records],
+    [findings, isSearching, trimmedQuery, severityFilter, statusFilter, records],
   );
 
   const grouped = useMemo(
@@ -283,9 +304,7 @@ export function TaskList({ initialRecords }: TaskListProps) {
 
   const counts = SEVERITY_ORDER.map((severity) => ({
     severity,
-    count: NUMBERED_SECURITY_FINDINGS.filter(
-      (finding) => finding.severity === severity,
-    ).length,
+    count: findings.filter((finding) => finding.severity === severity).length,
   }));
 
   const statusCounts = useMemo(() => {
@@ -293,7 +312,7 @@ export function TaskList({ initialRecords }: TaskListProps) {
       STATUS_ORDER.map((status) => [status, 0]),
     );
 
-    for (const finding of NUMBERED_SECURITY_FINDINGS) {
+    for (const finding of findings) {
       const status = getRecordStatus(finding, records);
       tally.set(status, (tally.get(status) ?? 0) + 1);
     }
@@ -302,15 +321,15 @@ export function TaskList({ initialRecords }: TaskListProps) {
       status,
       count: tally.get(status) ?? 0,
     }));
-  }, [records]);
+  }, [findings, records]);
 
   // Progress = finished tasks over the full set of findings (including "No
   // Aplica" in the denominator).
   const progress = useMemo(() => {
-    const total = NUMBERED_SECURITY_FINDINGS.length;
+    const total = findings.length;
     let finalizadas = 0;
 
-    for (const finding of NUMBERED_SECURITY_FINDINGS) {
+    for (const finding of findings) {
       if (getRecordStatus(finding, records) === "Finalizada") {
         finalizadas += 1;
       }
@@ -319,7 +338,7 @@ export function TaskList({ initialRecords }: TaskListProps) {
     const percent = total === 0 ? 0 : Math.round((finalizadas / total) * 100);
 
     return { finalizadas, total, percent };
-  }, [records]);
+  }, [findings, records]);
 
   const toggleSeverity = (severity: Severity) => {
     setSeverityFilter((prev) => (prev === severity ? null : severity));
@@ -489,10 +508,86 @@ export function TaskList({ initialRecords }: TaskListProps) {
     });
   };
 
+  const openCreateFinding = () => {
+    setFindingError(null);
+    setFindingSuccess(false);
+    setFindingModal({
+      mode: "create",
+      values: {
+        code: "",
+        severity: "MEDIO",
+        category: "platform",
+        title: "",
+        detail: "",
+      },
+    });
+  };
+
+  const openEditFinding = (finding: NumberedSecurityFinding) => {
+    setFindingError(null);
+    setFindingSuccess(false);
+    setFindingModal({
+      mode: "edit",
+      id: finding.id,
+      values: {
+        code: finding.code,
+        severity: finding.severity,
+        category: finding.category,
+        title: finding.title,
+        detail: finding.detail,
+      },
+    });
+  };
+
+  const closeFindingModal = () => {
+    if (isFindingPending || findingSuccess) {
+      return;
+    }
+
+    setFindingModal(null);
+    setFindingError(null);
+  };
+
+  const handleSubmitFinding = (values: FindingFormValues) => {
+    if (!findingModal) {
+      return;
+    }
+
+    setFindingError(null);
+
+    startFindingTransition(async () => {
+      const result = await upsertSecurityFindingAction({
+        id: findingModal.id,
+        ...values,
+      });
+
+      if (!result.success) {
+        setFindingError(result.error);
+        return;
+      }
+
+      setFindingSuccess(true);
+
+      window.setTimeout(() => {
+        setFindingSuccess(false);
+        setFindingModal(null);
+        router.refresh();
+      }, 1600);
+    });
+  };
+
   return (
     <>
       <div className="space-y-4">
         <div className="flex flex-wrap justify-end items-center gap-4">
+          <button
+            type="button"
+            onClick={openCreateFinding}
+            className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Agregar hallazgo
+          </button>
           <div
             className="t-input-dissolve relative w-full sm:w-64"
             data-clearing={isClearing ? "true" : "false"}
@@ -731,6 +826,14 @@ export function TaskList({ initialRecords }: TaskListProps) {
                               >
                                 <button
                                   type="button"
+                                  aria-label="Editar hallazgo"
+                                  onClick={() => openEditFinding(finding)}
+                                  className="rounded-full border border-foreground/10 p-1.5 text-foreground/50 transition-colors hover:bg-white/70 hover:text-foreground"
+                                >
+                                  <PencilSquareIcon className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
                                   disabled={isSubmitting}
                                   onClick={() => openNoteChange(finding)}
                                   className="rounded-full border border-foreground/10 px-2.5 py-1 text-[11px] font-semibold text-foreground/60 transition-colors hover:bg-white/70 hover:text-foreground disabled:opacity-50"
@@ -845,6 +948,17 @@ export function TaskList({ initialRecords }: TaskListProps) {
         errorMessage={modalError}
         onClose={closeModal}
         onSubmit={handleSubmitChange}
+      />
+
+      <FindingModal
+        open={findingModal !== null}
+        mode={findingModal?.mode ?? "create"}
+        initialValues={findingModal?.values}
+        isSubmitting={isFindingPending}
+        showSuccess={findingSuccess}
+        errorMessage={findingError}
+        onClose={closeFindingModal}
+        onSubmit={handleSubmitFinding}
       />
     </>
   );

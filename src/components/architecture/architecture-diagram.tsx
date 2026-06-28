@@ -8,6 +8,8 @@ import {
   ReactFlowProvider,
   Background,
   BackgroundVariant,
+  BaseEdge,
+  getSmoothStepPath,
   Handle,
   MarkerType,
   NodeToolbar,
@@ -16,6 +18,7 @@ import {
   useNodesState,
   useReactFlow,
   type Edge,
+  type EdgeProps,
   type Node,
   type NodeProps,
 } from "@xyflow/react";
@@ -118,6 +121,12 @@ function NodeHandles() {
       <Handle id="right-t-hi" type="target" position={Position.Right} className={handleClass} style={{ top: "25%" }} />
       <Handle id="right-s-lo" type="source" position={Position.Right} className={handleClass} style={{ top: "75%" }} />
       <Handle id="right-t-lo" type="target" position={Position.Right} className={handleClass} style={{ top: "75%" }} />
+      {/* Offset top-side handles so an outgoing edge's origin dot doesn't land on
+          the same point as another edge's incoming arrow (e.g. "Service Account"). */}
+      <Handle id="top-s-r" type="source" position={Position.Top} className={handleClass} style={{ left: "72%" }} />
+      <Handle id="top-t-r" type="target" position={Position.Top} className={handleClass} style={{ left: "72%" }} />
+      {/* Offset bottom-side handle to separate two edges dropping out the bottom. */}
+      <Handle id="bottom-s-r" type="source" position={Position.Bottom} className={handleClass} style={{ left: "68%" }} />
     </>
   );
 }
@@ -732,7 +741,65 @@ const NODES: Node[] = [
 
 const brand = "var(--brand)";
 const marker = { type: MarkerType.ArrowClosed, color: brand, width: 16, height: 16 };
+// Custom SVG marker (defined in <EdgeMarkerDefs/>) drawing a filled dot at the
+// edge origin, so every connection starts with a circle and ends with an arrow.
+// Pass just the id: React Flow wraps it into url('#id') itself.
+const dotMarker = "arch-edge-dot";
 const baseStyle = { stroke: brand, strokeWidth: 1.5, strokeOpacity: 0.55 };
+
+function EdgeMarkerDefs() {
+  return (
+    <svg aria-hidden="true" style={{ position: "absolute", width: 0, height: 0 }}>
+      <defs>
+        <marker
+          id="arch-edge-dot"
+          markerWidth="5"
+          markerHeight="5"
+          refX="2.5"
+          refY="2.5"
+          markerUnits="userSpaceOnUse"
+          orient="auto"
+        >
+          <circle cx="2.5" cy="2.5" r="2.5" fill={brand} fillOpacity={0.55} />
+        </marker>
+      </defs>
+    </svg>
+  );
+}
+
+// Orthogonal edge whose horizontal run is forced through a given Y (data.centerY)
+// so it travels along a clear band between node rows instead of behind nodes.
+function ChannelEdge(props: EdgeProps) {
+  const {
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    markerStart,
+    markerEnd,
+    style,
+    data,
+  } = props;
+  const d = data as { centerY?: number; centerX?: number } | undefined;
+  const [path] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    borderRadius: 24,
+    ...(typeof d?.centerY === "number" ? { centerY: d.centerY } : {}),
+    ...(typeof d?.centerX === "number" ? { centerX: d.centerX } : {}),
+  });
+  return (
+    <BaseEdge path={path} markerStart={markerStart} markerEnd={markerEnd} style={style} />
+  );
+}
+
+const edgeTypes = { channel: ChannelEdge };
 
 function edge(
   id: string,
@@ -751,6 +818,7 @@ function edge(
     targetHandle,
     type,
     animated,
+    markerStart: dotMarker,
     markerEnd: marker,
     style: baseStyle,
     ...(type === "smoothstep"
@@ -771,14 +839,40 @@ const EDGES: Edge[] = [
   // doesn't cross the "Envío de campañas" node directly below it nor merge with
   // the edges leaving that node's bottom.
   edge("e5", "logica_alertas", "left-s", "ext_msg", "left-t", true),
-  // Exits the lower-right and drops down the open corridor between the UI and SQL
-  // lanes, then runs along the bottom into the platforms' right side.
-  edge("e6", "envio_campanas", "right-s-lo", "ext_ads", "right-t", true),
-  // UI -> shared services. Leaves the right-center, distinct from e4 (upper) and
-  // e6 (lower), avoiding crossing Notificaciones directly below "Envío".
-  edge("e7", "envio_campanas", "right-s", "service_account", "top-t"),
+  // Both leave the bottom of "Envío de campañas" and route their horizontal run
+  // through the clear band between the table/function rows (end ~y388) and the
+  // lower node row (start ~y450), so they never pass behind a node.
+  {
+    id: "e7",
+    source: "envio_campanas",
+    sourceHandle: "bottom-s",
+    target: "service_account",
+    targetHandle: "top-t",
+    type: "channel",
+    data: { centerY: 410 },
+    markerStart: dotMarker,
+    markerEnd: marker,
+    style: baseStyle,
+  } as Edge,
+  {
+    id: "e6",
+    source: "envio_campanas",
+    sourceHandle: "bottom-s-r",
+    target: "ext_ads",
+    targetHandle: "left-t",
+    type: "channel",
+    animated: true,
+    // Drops down the clear corridor between Notificaciones and Secret Manager
+    // (x ~388), runs along the bottom and enters the platforms from the left.
+    data: { centerY: 432, centerX: 388 },
+    markerStart: dotMarker,
+    markerEnd: marker,
+    style: baseStyle,
+  } as Edge,
   edge("e8", "service_account", "left-s", "secret_manager", "right-t", false, "straight"),
-  edge("e9", "service_account", "top-s", "fn_oss", "left-t"),
+  // Leaves the top-right of Service Account so its origin dot doesn't sit on the
+  // same point where e7's arrow enters the top-center.
+  edge("e9", "service_account", "top-s-r", "fn_oss", "left-t"),
   // Cloud Functions (lane C) -> tables (lane B), leftward
   edge("e11", "fn_oss", "left-s", "tbl_camp_oss", "right-t", true),
   edge("e12", "fn_perf", "left-s", "tbl_camp_plat", "right-t", true),
@@ -789,8 +883,9 @@ const EDGES: Edge[] = [
   // space between the functions and GCS) so it doesn't cross Service Account,
   // which sits directly above the platforms' top edge.
   edge("e13", "fn_perf", "right-s", "ext_ads", "right-t", true),
-  // Scheduler triggers functions (downward)
-  edge("e15", "cloud_scheduler", "bottom-s", "fn_oss", "top-t"),
+  // Scheduler triggers functions (downward). Enters the top-right of the function
+  // so the bend stays clear of the "CLOUD FUNCTIONS" group label on the left.
+  edge("e15", "cloud_scheduler", "bottom-s", "fn_oss", "top-t-r"),
 ];
 
 const FIT_VIEW_OPTIONS = { padding: 0.12 };
@@ -892,6 +987,7 @@ function DiagramInner() {
           each side (= 10% of the viewport) to span the full window width without
           relying on 100vw (which would overflow past the reserved scrollbar gutter). */}
       <div ref={canvasRef} className="h-[680px] -mx-[12.5%] overflow-hidden">
+        <EdgeMarkerDefs />
         <ReactFlow
           className="arch-flow"
           nodes={nodes}
@@ -900,6 +996,7 @@ function DiagramInner() {
           onNodeClick={handleNodeClick}
           onPaneClick={handlePaneClick}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           fitView
           fitViewOptions={FIT_VIEW_OPTIONS}
           minZoom={0.3}
