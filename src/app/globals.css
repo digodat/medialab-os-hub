@@ -101,13 +101,15 @@
   }
   body {
     @apply text-foreground;
+    position: relative;
     min-height: 100dvh;
     background-color: var(--app-background);
   }
-  /* Grain overlay — fixed layer above everything, non-interactive */
+  /* Grain overlay — covers the full document height and scrolls with the
+     content (absolute, anchored to body) so it never appears to lag behind. */
   body::after {
     content: '';
-    position: fixed;
+    position: absolute;
     inset: 0;
     z-index: 99999;
     pointer-events: none;
@@ -243,6 +245,17 @@
 .arch-flow:has(.react-flow__node.selected) .react-flow__node:not(.selected),
 .arch-flow:has(.react-flow__node.selected) .react-flow__edges,
 .arch-flow:has(.react-flow__node.selected) .react-flow__background {
+  filter: blur(3px);
+  opacity: 0.45;
+}
+
+/* Roadmap: blur the chart box when a task popup is open (same focus effect) */
+.roadmap-box {
+  transition:
+    filter 0.25s ease,
+    opacity 0.25s ease;
+}
+.roadmap-scope[data-dialog-open] .roadmap-box {
   filter: blur(3px);
   opacity: 0.45;
 }
