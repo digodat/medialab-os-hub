@@ -18,8 +18,10 @@ const SECTIONS = [
 
 export default function HomePage() {
   return (
-    <main className="relative max-w-[1440px] mx-auto px-6 md:px-16">
+    <>
       {/* Home-only extra grain layered above the global body::after grain.
+          Rendered at body level (not inside the max-width main) so it spans
+          the full width and never shows a vertical seam at the content edges.
           Intentional exception to the single-grain convention, scoped to home. */}
       <div
         aria-hidden="true"
@@ -32,6 +34,7 @@ export default function HomePage() {
           mixBlendMode: "multiply",
         }}
       />
+      <main className="relative max-w-[1440px] mx-auto px-6 md:px-16">
       <section className="relative h-dvh overflow-hidden flex flex-col justify-center gap-8 md:gap-10 py-8">
         <div className="absolute top-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 font-heading text-3xl tracking-tighter text-foreground leading-none">
           <span className="opacity-80 blur-[0.5px]">
@@ -175,6 +178,7 @@ export default function HomePage() {
           </p>
         </div>
       </section>
-    </main>
+      </main>
+    </>
   );
 }

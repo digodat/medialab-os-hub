@@ -1,18 +1,22 @@
 import {
   RoadmapBars,
+  RoadmapConnectors,
   RoadmapInteractive,
+  type RoadmapArrowhead,
   type RoadmapBarItem,
+  type RoadmapConnector,
 } from "@/components/roadmap/roadmap-bars";
 import { cn } from "@/lib/utils";
 import {
   BAR_H,
   buildTimeline,
-  formatMonthLabel,
-  monthOffsetOf,
+  formatWeekLabel,
+  weekOffsetOf,
   packLanes,
   ROADMAP_EPICS,
   ROADMAP_GROUPS,
   STATUS_STYLES,
+  WEEKS_PER_MONTH,
   type RoadmapEpic,
   type RoadmapStatus,
 } from "@/lib/roadmap/roadmap-data";
@@ -27,9 +31,9 @@ const HEADER_H = 56;
 const ROW_H = 40;
 const GROUP_PAD = 14;
 const SIDEBAR_W = 212;
-const MONTH_MIN_W = 92;
-// Horizontal control-handle length for dependency curves, in month units.
-const CURVE = 0.4;
+const WEEK_MIN_W = 136;
+// Horizontal control-handle length for dependency curves, in week units.
+const CURVE = 1.2;
 
 type PositionedEpic = {
   epic: RoadmapEpic;
@@ -45,10 +49,10 @@ type PositionedGroup = {
   epics: PositionedEpic[];
 };
 
-type EpicAnchor = { startMonth: number; endMonth: number; centerY: number };
+type EpicAnchor = { startWeek: number; endWeek: number; centerY: number };
 
-function buildLayout(totalMonths: number) {
-  const pct = (months: number) => (months / totalMonths) * 100;
+function buildLayout(totalWeeks: number) {
+  const pct = (weeks: number) => (weeks / totalWeeks) * 100;
   const groups: PositionedGroup[] = [];
   const byId = new Map<string, EpicAnchor>();
   let cursorY = 0;
@@ -62,14 +66,14 @@ function buildLayout(totalMonths: number) {
       const lane = laneOf.get(epic.id) ?? 0;
       const centerY = cursorY + GROUP_PAD + lane * ROW_H + ROW_H / 2;
       byId.set(epic.id, {
-        startMonth: epic.startMonth,
-        endMonth: epic.endMonth,
+        startWeek: epic.startWeek,
+        endWeek: epic.endWeek,
         centerY,
       });
       return {
         epic,
-        leftPct: pct(epic.startMonth),
-        widthPct: pct(epic.endMonth - epic.startMonth + 1),
+        leftPct: pct(epic.startWeek),
+        widthPct: pct(epic.endWeek - epic.startWeek + 1),
         top: centerY - BAR_H / 2,
       };
     });
@@ -83,17 +87,17 @@ function buildLayout(totalMonths: number) {
 
 export function RoadmapGantt() {
   const timeline = buildTimeline();
-  const { totalMonths } = timeline;
-  const pct = (months: number) => (months / totalMonths) * 100;
-  const { groups, byId, totalHeight } = buildLayout(totalMonths);
+  const { totalWeeks } = timeline;
+  const pct = (weeks: number) => (weeks / totalWeeks) * 100;
+  const { groups, byId, totalHeight } = buildLayout(totalWeeks);
 
-  const todayOffset = monthOffsetOf(new Date(), totalMonths);
-  const minGridWidth = SIDEBAR_W + totalMonths * MONTH_MIN_W;
+  const todayOffset = weekOffsetOf(new Date(), totalWeeks);
+  const minGridWidth = SIDEBAR_W + totalWeeks * WEEK_MIN_W;
 
   // Dependency connectors: source must finish before target starts. The path
-  // uses month-units on X and px on Y; the arrowhead is positioned separately.
-  const connectors: { id: string; d: string }[] = [];
-  const arrowheads: { id: string; leftPct: number; top: number }[] = [];
+  // uses week-units on X and px on Y; the arrowhead is positioned separately.
+  const connectors: RoadmapConnector[] = [];
+  const arrowheads: RoadmapArrowhead[] = [];
   for (const target of ROADMAP_EPICS) {
     if (!target.dependsOn) continue;
     const to = byId.get(target.id);
@@ -101,20 +105,32 @@ export function RoadmapGantt() {
     for (const sourceId of target.dependsOn) {
       const from = byId.get(sourceId);
       if (!from) continue;
-      const sx = from.endMonth + 1;
+      const sx = from.endWeek + 1;
       const sy = from.centerY;
-      const tx = to.startMonth;
+      const tx = to.startWeek;
       const ty = to.centerY;
       connectors.push({
         id: `${sourceId}->${target.id}`,
         d: `M ${sx} ${sy} C ${sx + CURVE} ${sy}, ${tx - CURVE} ${ty}, ${tx} ${ty}`,
+        from: sourceId,
+        to: target.id,
       });
       arrowheads.push({
         id: `${sourceId}->${target.id}`,
+        from: sourceId,
+        to: target.id,
         leftPct: pct(tx),
         top: ty,
       });
     }
+  }
+
+  // Adjacency map for hover highlighting: each epic maps to the epics it is
+  // linked to via dependency arrows, in both directions.
+  const relatedById: Record<string, string[]> = {};
+  for (const connector of connectors) {
+    (relatedById[connector.from] ??= []).push(connector.to);
+    (relatedById[connector.to] ??= []).push(connector.from);
   }
 
   // Flatten bars with their popup detail for the interactive (client) layer.
@@ -130,16 +146,17 @@ export function RoadmapGantt() {
       widthPct,
       top,
       groupName: group.name,
-      rangeLabel: `${formatMonthLabel(epic.startMonth)} – ${formatMonthLabel(epic.endMonth)}`,
+      rangeLabel: `${formatWeekLabel(epic.startWeek)} – ${formatWeekLabel(epic.endWeek)}`,
       detail: epic.detail,
       dependencies: (epic.dependsOn ?? []).map(
         (id) => epicTitleById.get(id) ?? id,
       ),
+      owner: epic.owner,
     })),
   );
 
   return (
-    <RoadmapInteractive>
+    <RoadmapInteractive relations={relatedById}>
       <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2 text-xs text-foreground/60">
         <span className="text-foreground/45">Estado:</span>
         {(Object.keys(STATUS_STYLES) as RoadmapStatus[]).map((status) => (
@@ -184,31 +201,32 @@ export function RoadmapGantt() {
               Iniciativas
             </div>
 
-            {/* Axis header: quarters over months */}
+            {/* Axis header: months over weeks */}
             <div className="sticky top-0 z-30 border-b border-foreground/10 bg-white/85 backdrop-blur-sm">
               <div className="flex" style={{ height: HEADER_H / 2 }}>
-                {timeline.quarters.map((quarter) => (
+                {timeline.months.map((month) => (
                   <div
-                    key={quarter.label}
+                    key={month.label}
                     className="flex items-center border-l border-foreground/10 px-3 text-xs font-semibold text-foreground/70 first:border-l-0"
-                    style={{ width: `${pct(quarter.span)}%` }}
+                    style={{ width: `${pct(month.span)}%` }}
                   >
-                    {quarter.label}
+                    {month.label}
                   </div>
                 ))}
               </div>
               <div className="flex" style={{ height: HEADER_H / 2 }}>
-                {timeline.months.map((month) => (
+                {timeline.weeks.map((week) => (
                   <div
-                    key={month.index}
+                    key={week.index}
                     className={cn(
-                      "flex items-center justify-center text-[11px] text-foreground/40",
-                      month.index % 3 === 0 && "border-l border-foreground/10",
-                      month.index === 0 && "border-l-0",
+                      "flex items-center justify-center text-[10px] text-foreground/40",
+                      week.index % WEEKS_PER_MONTH === 0 &&
+                        "border-l border-foreground/10",
+                      week.index === 0 && "border-l-0",
                     )}
                     style={{ width: `${pct(1)}%` }}
                   >
-                    {month.label}
+                    {week.label}
                   </div>
                 ))}
               </div>
@@ -237,13 +255,24 @@ export function RoadmapGantt() {
 
             {/* Body: gridlines, bands, today marker, connectors and bars */}
             <div className="relative">
-              {/* Quarter gridlines */}
-              {timeline.quarters.map((quarter) =>
-                quarter.startIndex === 0 ? null : (
+              {/* Week gridlines (light) */}
+              {timeline.weeks.map((week) =>
+                week.index === 0 ? null : (
                   <div
-                    key={`grid-${quarter.label}`}
-                    className="absolute top-0 bottom-0 z-0 border-l border-foreground/[0.07]"
-                    style={{ left: `${pct(quarter.startIndex)}%` }}
+                    key={`wgrid-${week.index}`}
+                    className="absolute top-0 bottom-0 z-0 border-l border-foreground/[0.04]"
+                    style={{ left: `${pct(week.index)}%` }}
+                  />
+                ),
+              )}
+
+              {/* Month gridlines (stronger) */}
+              {timeline.months.map((month) =>
+                month.startIndex === 0 ? null : (
+                  <div
+                    key={`mgrid-${month.label}`}
+                    className="absolute top-0 bottom-0 z-0 border-l border-foreground/[0.09]"
+                    style={{ left: `${pct(month.startIndex)}%` }}
                   />
                 ),
               )}
@@ -269,51 +298,23 @@ export function RoadmapGantt() {
               {/* Today marker */}
               {todayOffset !== null && (
                 <div
+                  data-roadmap-today
                   className="absolute top-0 bottom-0 z-0 w-px bg-brand/60"
-                  style={{ left: `${(todayOffset / totalMonths) * 100}%` }}
+                  style={{ left: `${(todayOffset / totalWeeks) * 100}%` }}
                 >
-                  <span className="absolute -top-px left-1 rounded bg-brand px-1.5 py-0.5 text-[10px] font-medium text-white">
+                  <span className="absolute -top-px left-1/2 -translate-x-1/2 rounded bg-brand px-1.5 py-0.5 text-[10px] font-medium text-white">
                     Hoy
                   </span>
                 </div>
               )}
 
-              {/* Dependency connectors (scalable, non-distorting stroke) */}
-              <svg
-                className="pointer-events-none absolute inset-0 z-0 text-foreground/35"
-                width="100%"
-                height={totalHeight}
-                viewBox={`0 0 ${totalMonths} ${totalHeight}`}
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                {connectors.map((connector) => (
-                  <path
-                    key={connector.id}
-                    d={connector.d}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeDasharray="4 3"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                ))}
-              </svg>
-
-              {/* Dependency arrowheads (point into the target's left edge) */}
-              {arrowheads.map((head) => (
-                <div
-                  key={head.id}
-                  className="absolute z-0"
-                  style={{
-                    left: `${head.leftPct}%`,
-                    top: head.top,
-                    transform: "translate(-100%, -50%)",
-                  }}
-                >
-                  <div className="h-0 w-0 border-y-[4px] border-l-[6px] border-y-transparent border-l-foreground/35" />
-                </div>
-              ))}
+              {/* Dependency connectors + arrowheads (hover-aware client layer) */}
+              <RoadmapConnectors
+                connectors={connectors}
+                arrowheads={arrowheads}
+                totalWeeks={totalWeeks}
+                totalHeight={totalHeight}
+              />
 
               {/* Epic bars (interactive: click opens a detail popup) */}
               <RoadmapBars bars={barItems} />

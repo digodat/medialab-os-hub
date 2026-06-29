@@ -2,7 +2,16 @@
 
 /* eslint-disable @next/next/no-img-element -- local static brand/product SVGs */
 
-import { Fragment, useCallback, useEffect, useRef } from "react";
+import {
+  createContext,
+  Fragment,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -36,14 +45,33 @@ import { cn } from "@/lib/utils";
 
 type IconType = ComponentType<SVGProps<SVGSVGElement>>;
 
+// Shared hover state so nodes and edges can react to the currently hovered node:
+// the node and the edges touching it are emphasized while the rest dim out
+// (mirrors the roadmap Gantt hover effect).
+const HoverContext = createContext<string | null>(null);
+const useHoveredId = () => useContext(HoverContext);
+
+function hoverClasses(id: string | undefined, hoveredId: string | null) {
+  if (!id || hoveredId === null) return undefined;
+  return id === hoveredId
+    ? "border-brand/60 shadow-md ring-2 ring-brand/40"
+    : "opacity-70";
+}
+
 // rationaleTitle / rationale render an extra "Why this product?" section in the
 // popup, explaining why the tool was chosen over alternatives.
+// items / itemsTitle render an extra titled list inside the popup (e.g. breaking
+// down a single diagram box into the underlying Cloud Functions).
+type PopoverItem = { name: string; description: string };
+
 type ServiceData = {
   title: string;
   subtitle?: string;
   description: string;
   Icon?: IconType;
   logo?: string;
+  itemsTitle?: string;
+  items?: PopoverItem[];
   rationaleTitle?: string;
   rationale?: string;
 };
@@ -110,24 +138,60 @@ function NodeHandles() {
   );
 }
 
+// Base card styling. Width is decided per-popup (wider when it carries an items
+// list). max-h / max-w are viewport-relative so the popup always fits on screen,
+// scrolling internally if the content is very tall.
 const popoverClass =
-  "max-w-[280px] rounded-xl border border-foreground/10 bg-white/80 px-4 py-3 text-left shadow-lg backdrop-blur-md";
+  "rounded-xl border border-foreground/10 bg-white/80 px-4 py-3 text-left shadow-lg backdrop-blur-md max-h-[80vh] overflow-y-auto";
 
 function Popover({
   title,
   description,
+  itemsTitle,
+  items,
   rationaleTitle,
   rationale,
 }: {
   title: string;
   description: string;
+  itemsTitle?: string;
+  items?: PopoverItem[];
   rationaleTitle?: string;
   rationale?: string;
 }) {
+  // A popup with an items list needs more room: widen it and lay the items out
+  // in two columns so it doesn't grow into a tall, narrow strip.
+  const hasItems = !!items && items.length > 0;
   return (
-    <div className={popoverClass}>
+    <div
+      className={cn(
+        popoverClass,
+        hasItems ? "w-[440px] max-w-[90vw]" : "w-[280px] max-w-[90vw]",
+      )}
+    >
       <p className="text-sm font-bold tracking-tight text-foreground">{title}</p>
       <p className="mt-1 text-[13px] leading-relaxed text-foreground/55">{description}</p>
+      {hasItems && (
+        <div className="mt-3 border-t border-foreground/10 pt-2.5">
+          {itemsTitle && (
+            <p className="text-[13px] font-bold tracking-tight text-brand">
+              {itemsTitle}
+            </p>
+          )}
+          <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2.5">
+            {items.map((item) => (
+              <li key={item.name}>
+                <p className="font-mono text-[12px] font-semibold tracking-tight text-foreground">
+                  {item.name}
+                </p>
+                <p className="mt-0.5 text-[12px] leading-relaxed text-foreground/55">
+                  {item.description}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {rationale && (
         <div className="mt-3 border-t border-foreground/10 pt-2.5">
           <p className="text-[13px] font-bold tracking-tight text-brand">
@@ -142,15 +206,17 @@ function Popover({
   );
 }
 
-function ServiceNode({ data, selected }: NodeProps) {
+function ServiceNode({ id, data, selected }: NodeProps) {
   const d = data as ServiceData;
   const Icon = d.Icon;
+  const hoveredId = useHoveredId();
   return (
     <div
       className={cn(
         "flex h-full w-full items-center gap-2 rounded-xl border border-foreground/10 bg-white/70 px-3 py-2 shadow-sm backdrop-blur-sm transition-all duration-150",
         "hover:border-brand/40 hover:shadow-md",
         selected && "border-brand ring-2 ring-brand/30",
+        hoverClasses(id, hoveredId),
       )}
     >
       <NodeHandles />
@@ -171,14 +237,16 @@ function ServiceNode({ data, selected }: NodeProps) {
   );
 }
 
-function StorageNode({ data, selected }: NodeProps) {
+function StorageNode({ id, data, selected }: NodeProps) {
   const d = data as StorageData;
+  const hoveredId = useHoveredId();
   return (
     <div
       className={cn(
         "flex h-full w-full items-center gap-2 rounded-xl border border-foreground/10 bg-white/70 px-3 py-2 shadow-sm backdrop-blur-sm transition-all duration-150",
         "hover:border-brand/40 hover:shadow-md",
         selected && "border-brand ring-2 ring-brand/30",
+        hoverClasses(id, hoveredId),
       )}
     >
       <NodeHandles />
@@ -192,14 +260,16 @@ function StorageNode({ data, selected }: NodeProps) {
   );
 }
 
-function BrandsNode({ data, selected }: NodeProps) {
+function BrandsNode({ id, data, selected }: NodeProps) {
   const d = data as BrandsData;
+  const hoveredId = useHoveredId();
   return (
     <div
       className={cn(
         "flex h-full w-full flex-col justify-center gap-2 rounded-xl border border-foreground/10 bg-white/70 px-3 py-2 shadow-sm backdrop-blur-sm transition-all duration-150",
         "hover:border-brand/40 hover:shadow-md",
         selected && "border-brand ring-2 ring-brand/30",
+        hoverClasses(id, hoveredId),
       )}
     >
       <NodeHandles />
@@ -222,6 +292,9 @@ function GroupNode({ data }: NodeProps) {
   const d = data as GroupData;
   return (
     <div className="relative h-full w-full rounded-2xl border border-dashed border-foreground/25 bg-white/15">
+      {/* Target handle so an edge can point at the group as a whole (e.g. the
+          scheduler triggering every function inside it). */}
+      <Handle id="top-t" type="target" position={Position.Top} className={handleClass} />
       {d.title && (
         <span className="absolute left-4 top-3 text-[11px] font-bold uppercase tracking-wide text-foreground/45">
           {d.title}
@@ -231,10 +304,11 @@ function GroupNode({ data }: NodeProps) {
   );
 }
 
-function LabelNode({ data, selected }: NodeProps) {
+function LabelNode({ id, data, selected }: NodeProps) {
   const d = data as LabelData;
   const Icon = d.Icon;
   const interactive = !!d.description;
+  const hoveredId = useHoveredId();
 
   // Interactive labels (Cloud Run, Cloud SQL, ...) render as platform buttons,
   // matching the rest of the nodes but with the light gray background. Plain
@@ -258,7 +332,12 @@ function LabelNode({ data, selected }: NodeProps) {
   }
 
   return (
-    <div className="group flex h-full w-full cursor-pointer items-center justify-center gap-2">
+    <div
+      className={cn(
+        "group flex h-full w-full cursor-pointer items-center justify-center gap-2 rounded-xl transition-all duration-150",
+        hoverClasses(id, hoveredId),
+      )}
+    >
       {d.logo ? (
         <img src={d.logo} alt="" className="h-7 w-auto shrink-0 object-contain" />
       ) : Icon ? (
@@ -373,10 +452,10 @@ const NODES: Node[] = [
       title: "SSO / IAP",
       logo: "/logos/identity-aware-proxy.svg",
       description:
-        "Identity-Aware Proxy: autentica al equipo contra la Tabla Usuarios antes de exponer la UI.",
-      rationaleTitle: "¿Por qué IAP?",
+        "Capa de acceso que autentica al equipo contra la Tabla Usuarios antes de exponer la UI. El mecanismo concreto (Identity-Aware Proxy o SSO corporativo de Google Workspace) aún no está definido.",
+      rationaleTitle: "¿Por qué un gate de acceso gestionado?",
       rationale:
-        "Usamos Identity-Aware Proxy en lugar de implementar autenticación propia para no manejar contraseñas ni sesiones. Se integra con las cuentas de Google de la organización y aplica la autorización a nivel de infraestructura, antes de que el tráfico llegue a la app.",
+        "Delegamos la autenticación en un servicio gestionado (IAP o SSO corporativo) en lugar de implementar login propio: no manejamos contraseñas ni sesiones, se integra con las cuentas de la organización y la autorización se aplica antes de que el tráfico llegue a la app.",
     },
     style: boxStyle(228, 40),
   },
@@ -412,7 +491,7 @@ const NODES: Node[] = [
       title: "Envío de campañas a Plataformas",
       Icon: PaperAirplaneIcon,
       description:
-        "Publica campañas hacia Google Ads, Meta y TikTok usando la Service Account.",
+        "Publica campañas hacia Google Ads, Meta y TikTok usando la Service Account. El sistema opera tres mercados independientes (Chile, Colombia y Perú): cada país tiene sus propias credenciales de plataforma (MCC, cuentas de ads y Merchant Center), y el envío resuelve el mercado correcto según la campaña. Cada envío genera un job auditable con seguimiento paso a paso del progreso.",
     },
     style: boxStyle(228, 44),
   },
@@ -424,7 +503,7 @@ const NODES: Node[] = [
       title: "Captura de Datos",
       Icon: ServerStackIcon,
       description:
-        "Capa de captura de datos del backend. Orquesta la lógica de negocio y se autentica ante los servicios de GCP mediante la Service Account.",
+        "Capa de backend de la aplicación. La lógica de negocio vive en las API routes de Next.js (patrón BFF, alrededor de 47 endpoints) que orquestan OSS, las plataformas de publicidad, Cloud Storage y la base de datos; no hay un servicio backend separado. Se autentica ante los servicios de GCP mediante la Service Account.",
     },
     style: boxStyle(228, 40),
   },
@@ -500,7 +579,7 @@ const NODES: Node[] = [
       title: "Cloud Scheduler",
       logo: "/logos/cloud-scheduler.svg",
       description:
-        "Cron administrado que dispara las Cloud Functions de extracción de forma periódica.",
+        "Cron administrado que dispara periódicamente todas las Cloud Functions de extracción: OSS, las tres de performance (Google Ads, Meta, TikTok) y la de documentos.",
       rationaleTitle: "¿Por qué Cloud Scheduler?",
       rationale:
         "Preferimos un cron administrado a uno en una VM siempre encendida: no hay servidor que mantener y se integra de forma nativa con las Cloud Functions. Maneja reintentos y zonas horarias sin código adicional.",
@@ -517,7 +596,7 @@ const NODES: Node[] = [
       title: "Extracción OSS Data",
       logo: "/logos/cloud-functions.svg",
       description:
-        "Consume la OSS API y vuelca las campañas en la Tabla campañas OSS.",
+        "Consume la OSS API y vuelca las campañas en la Tabla campañas OSS. La ingesta corre por mercado: Chile, Colombia y Perú se procesan de forma independiente, con datos y credenciales separados por país.",
       rationaleTitle: "¿Por qué Cloud Functions?",
       rationale:
         "Las tareas de extracción son cortas y se ejecutan por evento, así que una función serverless es más eficiente que un servicio siempre activo. Pagamos solo por ejecución y cada función escala de forma independiente según su carga.",
@@ -547,7 +626,25 @@ const NODES: Node[] = [
       title: "Extracción de datos de performance de campañas",
       logo: "/logos/cloud-functions.svg",
       description:
-        "Obtiene métricas desde Google Ads, Meta y TikTok y las guarda en la Tabla campañas plataformas.",
+        "Obtiene métricas de performance desde las plataformas de publicidad y las consolida en la Tabla campañas plataformas. Aunque acá se representa como una sola caja, en la implementación son tres Cloud Functions independientes (una por plataforma): cada una expone un endpoint HTTP, la dispara Cloud Scheduler y escribe en el dataset de performance.",
+      itemsTitle: "Las tres Cloud Functions",
+      items: [
+        {
+          name: "gads-ingest",
+          description:
+            "Extrae métricas de Google Ads (inversión, impresiones, clics, conversiones) por campaña.",
+        },
+        {
+          name: "meta-ingest",
+          description:
+            "Extrae la performance de Meta (Facebook e Instagram Ads) desde la Marketing API.",
+        },
+        {
+          name: "tiktok-ingest",
+          description:
+            "Extrae la performance de TikTok Ads desde la Marketing API de TikTok.",
+        },
+      ],
       rationaleTitle: "¿Por qué Cloud Functions?",
       rationale:
         "Las tareas de extracción son cortas y se ejecutan por evento, así que una función serverless es más eficiente que un servicio siempre activo. Pagamos solo por ejecución y cada función escala de forma independiente según su carga.",
@@ -594,7 +691,7 @@ const NODES: Node[] = [
       subtitle: "dev tokens, secrets",
       logo: "/logos/secret-manager.svg",
       description:
-        "Custodia tokens de desarrollador y credenciales. Solo accesible vía la Service Account.",
+        "Custodia tokens y credenciales, incluidas las de cada mercado (MCC, cuentas de ads y Merchant Center de Chile, Colombia y Perú). Solo accesible vía la Service Account.",
       rationaleTitle: "¿Por qué Secret Manager?",
       rationale:
         "Centralizamos tokens y credenciales acá en lugar de variables de entorno o archivos en el repo. Ofrece versionado, control de acceso por IAM y auditoría de cada lectura del secreto.",
@@ -646,6 +743,22 @@ const NODES: Node[] = [
       ],
       description:
         "Plataformas destino del envío de campañas y origen de los datos de performance.",
+      itemsTitle: "Tipos de campaña que se pueden enviar",
+      items: [
+        {
+          name: "Google Ads",
+          description:
+            "Performance Max, Shopping, Search, Demand Gen y Display.",
+        },
+        {
+          name: "Meta",
+          description: "Campañas de Meta Ads (Facebook e Instagram).",
+        },
+        {
+          name: "TikTok",
+          description: "Campañas de TikTok Ads (deploy nativo en curso).",
+        },
+      ],
     },
     style: boxStyle(290, 80),
   },
@@ -658,6 +771,36 @@ const marker = { type: MarkerType.ArrowClosed, color: brand, width: 16, height: 
 // Pass just the id: React Flow wraps it into url('#id') itself.
 const dotMarker = "arch-edge-dot";
 const baseStyle = { stroke: brand, strokeWidth: 1.5, strokeOpacity: 0.55 };
+
+// Hover variants: emphasized (edge touches the hovered node) and dimmed (rest).
+const dimColor = "color-mix(in srgb, var(--brand) 40%, transparent)";
+const markerEmph = { type: MarkerType.ArrowClosed, color: brand, width: 16, height: 16 };
+const markerDim = { type: MarkerType.ArrowClosed, color: dimColor, width: 16, height: 16 };
+const dotMarkerDim = "arch-edge-dot-dim";
+const emphStyle = { stroke: brand, strokeWidth: 2.5, strokeOpacity: 1 };
+const dimStyle = { stroke: brand, strokeWidth: 1.5, strokeOpacity: 0.32 };
+
+// Recompute an edge's look from the hovered node: emphasize edges connected to
+// it, dim the rest. With nothing hovered, edges keep their base appearance.
+function decorateEdge(e: Edge, hoveredId: string | null): Edge {
+  if (!hoveredId) return e;
+  const active = e.source === hoveredId || e.target === hoveredId;
+  const startIsDot = typeof e.markerStart === "string";
+  if (active) {
+    return {
+      ...e,
+      style: emphStyle,
+      markerStart: startIsDot ? dotMarker : markerEmph,
+      markerEnd: markerEmph,
+    };
+  }
+  return {
+    ...e,
+    style: dimStyle,
+    markerStart: startIsDot ? dotMarkerDim : markerDim,
+    markerEnd: markerDim,
+  };
+}
 
 function EdgeMarkerDefs() {
   return (
@@ -673,6 +816,17 @@ function EdgeMarkerDefs() {
           orient="auto"
         >
           <circle cx="2.5" cy="2.5" r="2.5" fill={brand} fillOpacity={0.55} />
+        </marker>
+        <marker
+          id="arch-edge-dot-dim"
+          markerWidth="5"
+          markerHeight="5"
+          refX="2.5"
+          refY="2.5"
+          markerUnits="userSpaceOnUse"
+          orient="auto"
+        >
+          <circle cx="2.5" cy="2.5" r="2.5" fill={brand} fillOpacity={0.32} />
         </marker>
       </defs>
     </svg>
@@ -810,13 +964,15 @@ const EDGES: Edge[] = [
   // Cloud Functions -> sources / sinks (lane D), rightward
   edge("e10", "fn_oss", "right-s", "oss_api", "left-t", "uni"),
   edge("e14", "fn_docs", "right-s", "gcs", "left-t", "bi"),
-  // Cloud Functions performance -> ad platforms. Routed around the right (empty
-  // space between the functions and GCS) so it doesn't cross Service Account,
-  // which sits directly above the platforms' top edge.
-  edge("e13", "fn_perf", "right-s", "ext_ads", "right-t", "uni"),
-  // Scheduler triggers functions (downward). Enters the top-right of the function
-  // so the bend stays clear of the "CLOUD FUNCTIONS" group label on the left.
-  edge("e15", "cloud_scheduler", "bottom-s", "fn_oss", "top-t-r", "uni"),
+  // Ad platforms -> Cloud Functions performance: the extraction pulls metrics
+  // from the platforms, so the flow points into the function. Routed around the
+  // right (empty space between the functions and GCS) so it doesn't cross Service
+  // Account, which sits directly above the platforms' top edge.
+  edge("e13", "ext_ads", "right-s", "fn_perf", "right-t", "uni"),
+  // Scheduler triggers every extraction function. Drawn as a single edge into the
+  // Cloud Functions group box (it fires the whole group periodically), avoiding
+  // three separate lines through the already crowded sides of the stack.
+  edge("e15", "cloud_scheduler", "bottom-s", "g_fn", "top-t", "uni"),
 ];
 
 const FIT_VIEW_OPTIONS = { padding: 0.12 };
@@ -827,9 +983,27 @@ function DiagramInner() {
   const { setNodes, fitView, getViewport, setViewport } = useReactFlow();
   const canvasRef = useRef<HTMLDivElement>(null);
 
+  // Hovered node id: drives the highlight/dim effect on nodes and edges.
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
   // While a popup is open (a node is selected) we freeze the canvas so the
   // popup stays put: no pan, no zoom. Page scroll is still allowed.
   const hasSelection = nodes.some((n) => n.selected);
+
+  // Edges restyled from the hovered node. Group containers don't take part in
+  // the hover effect, so hovering one clears the highlight instead of dimming all.
+  const decoratedEdges = useMemo(
+    () => edges.map((e) => decorateEdge(e, hoveredId)),
+    [edges, hoveredId],
+  );
+
+  const handleNodeMouseEnter = useCallback(
+    (_: ReactMouseEvent, node: Node) => {
+      setHoveredId(node.type === "group" ? null : node.id);
+    },
+    [],
+  );
+  const handleNodeMouseLeave = useCallback(() => setHoveredId(null), []);
 
   // Horizontal wheel/trackpad (or Shift + wheel) pans the diagram sideways,
   // while vertical wheel is left to the page. A native non-passive listener is
@@ -897,6 +1071,8 @@ function DiagramInner() {
     | {
         title?: string;
         description?: string;
+        itemsTitle?: string;
+        items?: PopoverItem[];
         rationaleTitle?: string;
         rationale?: string;
       }
@@ -931,36 +1107,40 @@ function DiagramInner() {
           relying on 100vw (which would overflow past the reserved scrollbar gutter). */}
       <div ref={canvasRef} className="relative h-[680px] -mx-[12.5%] overflow-hidden">
         <EdgeMarkerDefs />
-        <ReactFlow
-          className="arch-flow"
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onNodeClick={handleNodeClick}
-          onPaneClick={handlePaneClick}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          fitView
-          fitViewOptions={FIT_VIEW_OPTIONS}
-          minZoom={0.3}
-          maxZoom={2}
-          nodesDraggable={false}
-          nodesConnectable={false}
-          elementsSelectable={false}
-          // Wheel is left to the page (so the section scrolls and its subtitle
-          // moves up). preventScrolling={false} is required so React Flow does
-          // not preventDefault plain wheel events over the canvas. Pan is done
-          // by dragging; zoom via pinch / Ctrl + wheel.
-          panOnScroll={false}
-          zoomOnScroll={false}
-          preventScrolling={false}
-          panOnDrag={!hasSelection}
-          zoomOnPinch={!hasSelection}
-          zoomOnDoubleClick={!hasSelection}
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background variant={BackgroundVariant.Dots} gap={22} size={1.5} color="var(--brand-subtle)" />
-        </ReactFlow>
+        <HoverContext.Provider value={hoveredId}>
+          <ReactFlow
+            className="arch-flow"
+            nodes={nodes}
+            edges={decoratedEdges}
+            onNodesChange={onNodesChange}
+            onNodeClick={handleNodeClick}
+            onNodeMouseEnter={handleNodeMouseEnter}
+            onNodeMouseLeave={handleNodeMouseLeave}
+            onPaneClick={handlePaneClick}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            fitView
+            fitViewOptions={FIT_VIEW_OPTIONS}
+            minZoom={0.3}
+            maxZoom={2}
+            nodesDraggable={false}
+            nodesConnectable={false}
+            elementsSelectable={false}
+            // Wheel is left to the page (so the section scrolls and its subtitle
+            // moves up). preventScrolling={false} is required so React Flow does
+            // not preventDefault plain wheel events over the canvas. Pan is done
+            // by dragging; zoom via pinch / Ctrl + wheel.
+            panOnScroll={false}
+            zoomOnScroll={false}
+            preventScrolling={false}
+            panOnDrag={!hasSelection}
+            zoomOnPinch={!hasSelection}
+            zoomOnDoubleClick={!hasSelection}
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background variant={BackgroundVariant.Dots} gap={22} size={1.5} color="var(--brand-subtle)" />
+          </ReactFlow>
+        </HoverContext.Provider>
         {/* Centered popup overlay. The wrapper ignores pointer events so a click
             outside the card falls through to the pane and closes the popup, while
             the card itself stays interactive. */}
@@ -970,6 +1150,8 @@ function DiagramInner() {
               <Popover
                 title={selectedData.title ?? ""}
                 description={selectedData.description}
+                itemsTitle={selectedData.itemsTitle}
+                items={selectedData.items}
                 rationaleTitle={selectedData.rationaleTitle}
                 rationale={selectedData.rationale}
               />

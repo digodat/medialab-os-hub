@@ -1,12 +1,17 @@
 // Roadmap domain model and timeline helpers.
 //
-// The chart is a quarter-based Gantt: each epic is a horizontal bar placed on a
-// month grid. Month indices are 0-based and relative to the timeline start
-// defined in TIMELINE_START. With the current config (Q2 2026, 4 quarters):
-//   0-2  -> Q2 '26 (Abr, May, Jun)
-//   3-5  -> Q3 '26 (Jul, Ago, Sep)
-//   6-8  -> Q4 '26 (Oct, Nov, Dic)
-//   9-11 -> Q1 '27 (Ene, Feb, Mar)
+// The chart is a month-grouped, week-granular Gantt: each epic is a horizontal
+// bar placed on a week grid. Week indices are 0-based and relative to the
+// timeline start (TIMELINE_START). Each month is a fixed block of
+// WEEKS_PER_MONTH weeks. With the current config (Jun–Dic 2026, 7 months × 4
+// weeks = 28 weeks):
+//   0-3   -> Jun '26 (S1-S4)
+//   4-7   -> Jul '26
+//   8-11  -> Ago '26
+//   12-15 -> Sep '26
+//   16-19 -> Oct '26
+//   20-23 -> Nov '26
+//   24-27 -> Dic '26
 
 export type RoadmapStatus = "planned" | "in-progress" | "done";
 
@@ -14,14 +19,16 @@ export type RoadmapEpic = {
   id: string;
   title: string;
   group: string;
-  // Inclusive month indices relative to the timeline start.
-  startMonth: number;
-  endMonth: number;
+  // Inclusive week indices relative to the timeline start.
+  startWeek: number;
+  endWeek: number;
   status: RoadmapStatus;
-  // Longer description shown in the task detail popup.
-  detail: string;
+  // Subtasks shown as a bullet list in the task detail popup.
+  detail: string[];
   // IDs of epics that must finish before this one (drawn as arrows).
   dependsOn?: string[];
+  // Optional owner of the epic, rendered as a badge (e.g. "Falabella").
+  owner?: string;
 };
 
 // Bar height (px). Shared so the server layout and the client bars agree.
@@ -53,9 +60,12 @@ export type RoadmapGroup = {
   name: string;
 };
 
-// Timeline starts at Q2 2026: month index 3 (April, 0-based) of 2026.
-export const TIMELINE_START = { year: 2026, month: 3 } as const;
-export const TIMELINE_QUARTERS = 4;
+// Timeline starts at June 2026 (month index 5, 0-based) and spans 7 months
+// (Jun–Dic 2026). Each month is split into WEEKS_PER_MONTH equal week columns
+// so bars can be placed at weekly granularity while the header stays month-based.
+export const TIMELINE_START = { year: 2026, month: 5 } as const;
+export const TIMELINE_MONTHS = 7;
+export const WEEKS_PER_MONTH = 4;
 
 const MONTH_ABBR = [
   "Ene",
@@ -74,241 +84,398 @@ const MONTH_ABBR = [
 
 export const ROADMAP_GROUPS: RoadmapGroup[] = [
   { id: "infra", name: "Infraestructura" },
-  { id: "platform", name: "Plataforma" },
-  { id: "experience", name: "Experiencia" },
+  { id: "datos", name: "Migración de datos" },
+  { id: "app", name: "Aplicación" },
 ];
 
+// Cloud SQL (PostgreSQL) es el destino confirmado del almacenamiento de datos.
+// Hoy todo vive en BigQuery (datasets `falabella_medialab_os` y
+// `platform_performance`); estas épicas son la migración de BigQuery a Cloud SQL
+// representada en el diagrama de arquitectura. Se consolida en 3 épicas (una por
+// grupo) y el detalle fino de cada fase vive en el popup de cada barra.
 export const ROADMAP_EPICS: RoadmapEpic[] = [
   // Infraestructura
   {
-    id: "infra-auth",
-    title: "Mejoras de autenticación",
+    id: "sql-infra",
+    title: "Aprovisionar Cloud SQL (PostgreSQL)",
     group: "infra",
-    startMonth: 0,
-    endMonth: 2,
-    status: "done",
-    detail:
-      "Refuerzo del flujo de autenticación: soporte de SSO corporativo, rotación de tokens y verificación en dos pasos para las cuentas con acceso a producción.",
-  },
-  {
-    id: "infra-scaling",
-    title: "Escalado de claves LLM/API",
-    group: "infra",
-    startMonth: 0,
-    endMonth: 3,
+    startWeek: 4,
+    endWeek: 4,
     status: "in-progress",
-    detail:
-      "Escalado horizontal de las claves de proveedores LLM/API con balanceo por cuota y límites por workspace para evitar throttling en horas pico.",
-  },
-  {
-    id: "infra-mcp",
-    title: "Soporte MCP para el núcleo",
-    group: "infra",
-    startMonth: 3,
-    endMonth: 6,
-    status: "in-progress",
-    dependsOn: ["infra-auth"],
-    detail:
-      "Implementación del protocolo MCP en el núcleo para exponer las herramientas internas a los agentes de forma estandarizada y segura.",
-  },
-  {
-    id: "infra-orgs",
-    title: "Migración a organizaciones separadas",
-    group: "infra",
-    startMonth: 5,
-    endMonth: 8,
-    status: "planned",
-    detail:
-      "Separación de los usuarios actuales en organizaciones independientes, con aislamiento de datos y administración delegada por organización.",
-  },
-  {
-    id: "infra-audit",
-    title: "Trazas de auditoría de agentes",
-    group: "infra",
-    startMonth: 6,
-    endMonth: 9,
-    status: "planned",
-    dependsOn: ["infra-mcp"],
-    detail:
-      "Trazas de auditoría completas de cada acción de los agentes: entradas, herramientas invocadas y salidas, con retención configurable.",
-  },
-  {
-    id: "infra-validation",
-    title: "Validación de salidas de agentes",
-    group: "infra",
-    startMonth: 9,
-    endMonth: 11,
-    status: "planned",
-    dependsOn: ["infra-audit"],
-    detail:
-      "Capa de validación automática de las salidas de los agentes antes de su entrega, con reglas por tipo de contenido y revisión humana opcional.",
+    owner: "Falabella",
+    detail: [
+      "Crear la instancia de Cloud SQL para PostgreSQL en sandbox-mm-f con alta disponibilidad, backups automáticos y ventana de mantenimiento.",
+      "Dimensionar tier y almacenamiento para el volumen actual de OSS y performance.",
+      "Conectar Cloud Run y las Cloud Functions por IP privada (VPC connector o Cloud SQL Auth Proxy).",
+      "Crear la Service Account con permisos mínimos y guardar las credenciales de conexión en Secret Manager.",
+    ],
   },
 
-  // Plataforma
+  // Migración de datos
   {
-    id: "plat-mcp-custom",
-    title: "Servidores MCP para usos personalizados",
-    group: "platform",
-    startMonth: 0,
-    endMonth: 3,
+    id: "sql-datos",
+    title: "Esquema y migración de datos",
+    group: "datos",
+    startWeek: 4,
+    endWeek: 5,
     status: "in-progress",
-    detail:
-      "Servidores MCP desplegables por el equipo para casos de uso personalizados, con catálogo interno y permisos por servidor.",
-  },
-  {
-    id: "plat-roles",
-    title: "Roles y permisos granulares",
-    group: "platform",
-    startMonth: 1,
-    endMonth: 3,
-    status: "done",
-    detail:
-      "Modelo de roles y permisos granulares a nivel de recurso, reemplazando el esquema binario actual de administrador/usuario.",
-  },
-  {
-    id: "plat-taxonomy",
-    title: "Gestor de taxonomía",
-    group: "platform",
-    startMonth: 2,
-    endMonth: 4,
-    status: "in-progress",
-    detail:
-      "Gestor centralizado de taxonomía para etiquetar y clasificar los activos de forma consistente en toda la plataforma.",
-  },
-  {
-    id: "plat-approval",
-    title: "Flujos de aprobación avanzados",
-    group: "platform",
-    startMonth: 3,
-    endMonth: 6,
-    status: "planned",
-    dependsOn: ["plat-roles"],
-    detail:
-      "Flujos de aprobación configurables con múltiples revisores, condiciones y notificaciones para las publicaciones sensibles.",
-  },
-  {
-    id: "plat-reports",
-    title: "Reportes de activos",
-    group: "platform",
-    startMonth: 5,
-    endMonth: 8,
-    status: "planned",
-    dependsOn: ["plat-taxonomy"],
-    detail:
-      "Reportes de uso y estado de los activos, exportables y programables, con métricas por organización y por proyecto.",
-  },
-  {
-    id: "plat-storefront",
-    title: "Integración de escaparate",
-    group: "platform",
-    startMonth: 7,
-    endMonth: 10,
-    status: "planned",
-    detail:
-      "Integración con el escaparate externo para publicar y sincronizar de forma automática los activos aprobados.",
-  },
-  {
-    id: "plat-onboarding",
-    title: "Nueva experiencia de onboarding",
-    group: "platform",
-    startMonth: 9,
-    endMonth: 11,
-    status: "planned",
-    detail:
-      "Rediseño de la experiencia de alta de nuevos usuarios con guías contextuales y configuración asistida del workspace.",
+    detail: [
+      "Modelar el esquema relacional de las tablas del diagrama (Usuarios, Actividades, Alertas, campañas OSS, campañas plataformas) con claves foráneas e índices.",
+      "Incluir la Tabla Actividades en el modelo: catálogo de acciones auditables, índices por usuario/fecha y política de retención.",
+      "Reproducir la jerarquía OSS campaign → service → strategy y resolver el multi-país (CL/CO/PE) que hoy cubren las tablas sufijadas.",
+      "Migrar los datos desde BigQuery (oss_*_{cl,co,pe}, deploy_jobs, performance gads/meta/tiktok) con ETL idempotente y validación de conteos.",
+      "Reescribir las ingestas (oss-ingest + performance) para escribir en Cloud SQL con upserts, reemplazando el patrón append-only + vistas _latest.",
+    ],
   },
 
-  // Experiencia
+  // Aplicación
   {
-    id: "xp-notif",
-    title: "Sistema de notificaciones in-app",
-    group: "experience",
-    startMonth: 1,
-    endMonth: 4,
+    id: "sql-app",
+    title: "Migración de la app y cutover",
+    group: "app",
+    startWeek: 6,
+    endWeek: 7,
+    status: "planned",
+    dependsOn: ["sql-infra", "sql-datos"],
+    detail: [
+      "Apuntar las lecturas de la app (/api/oss-campaigns y src/lib/performance/*) a Cloud SQL.",
+      "Migrar la persistencia de los jobs de envío (deploy_jobs) a Cloud SQL, aprovechando que el acceso ya está aislado en repositorios delgados (sin tocar API routes, hooks ni UI).",
+      "Período de doble escritura para validar la paridad de datos.",
+      "Dejar las lecturas conmutables a Cloud SQL, listas para el switch definitivo (se ejecuta en la épica de QA y cutover).",
+    ],
+  },
+
+  // SSO — hoy la app usa Google OAuth (cookies httpOnly + requireUserSession).
+  // El diagrama apunta a un gate SSO + Tabla Usuarios; el mecanismo concreto (IAP
+  // o SSO corporativo de Workspace) aún no está definido. Estas épicas cubren esa
+  // migración. auth-datos depende de Cloud SQL (sql-datos); auth-app cierra el bloque.
+  {
+    id: "auth-infra",
+    title: "Configurar SSO de acceso en Cloud Run",
+    group: "infra",
+    startWeek: 4,
+    endWeek: 4,
+    status: "planned",
+    owner: "Falabella",
+    detail: [
+      "Definir el mecanismo de acceso: Identity-Aware Proxy (IAP) o SSO corporativo de Google Workspace (aún sin definir).",
+      "Poner el control de acceso delante del servicio Cloud Run según el mecanismo elegido (load balancer + backend service si aplica).",
+      "Restringir el acceso al dominio corporativo del equipo.",
+      "Validar el flujo de login con cuentas reales y documentar la URL de acceso y el onboarding para nuevos operadores.",
+    ],
+  },
+  {
+    id: "auth-datos",
+    title: "Tabla Usuarios y permisos",
+    group: "datos",
+    startWeek: 5,
+    endWeek: 5,
+    status: "planned",
+    dependsOn: ["sql-datos"],
+    detail: [
+      "Implementar la Tabla Usuarios en Cloud SQL (email, rol, permisos, activo/inactivo).",
+      "Cargar el listado inicial de operadores autorizados (seed desde Workspace o lista acordada).",
+      "Exponer la consulta de autorización: el SSO entrega el email → la app valida contra la tabla.",
+      "Definir al menos dos roles iniciales (ej. operador y admin) y qué acciones habilita cada uno.",
+    ],
+  },
+  {
+    id: "auth-app",
+    title: "Integrar el SSO en la aplicación",
+    group: "app",
+    startWeek: 6,
+    endWeek: 7,
+    status: "planned",
+    dependsOn: ["auth-infra", "auth-datos"],
+    detail: [
+      "Reemplazar requireUserSession (cookie OAuth) por la identidad que entrega la capa de SSO.",
+      "Resolver el operador en deploy_jobs y auditoría con el email del SSO, sin depender de tokeninfo.",
+      "Mantener el OAuth de Google Ads/Sheets solo para llamadas a APIs de plataforma (scopes de Ads, Content, Sheets), separado del gate de acceso a la UI.",
+      "Retirar el flujo de login OAuth como requisito para entrar a la app y validar acceso end-to-end.",
+    ],
+  },
+
+  // Logs de actividades — hoy solo existe auditoría de envíos (deploy_jobs) e
+  // ingesta (sync_runs / *_history), no un log general de actividad de usuario.
+  // El diagrama apunta a un módulo "Logs de Actividades". La Tabla Actividades
+  // se modela dentro de "Esquema y migración de datos" (sql-datos); acá queda el
+  // módulo completo: captura (backend) + visualización (frontend), S4 jul.
+  {
+    id: "activity-logs",
+    title: "Módulo de Logs de Actividades",
+    group: "app",
+    startWeek: 7,
+    endWeek: 7,
+    status: "planned",
+    dependsOn: ["sql-datos"],
+    detail: [
+      "Instrumentar las API routes y acciones de la app para registrar cada acción del operador en la Tabla Actividades.",
+      "Usar la identidad de IAP (email) como autor de cada registro y registrar de forma no bloqueante (after()) para no afectar la latencia.",
+      "Cubrir las acciones clave: login, creación/envío de campañas y cambios de configuración.",
+      "Construir la vista de Logs de Actividades con listado paginado y filtros por usuario, tipo de acción y rango de fechas.",
+      "Enlazar cada registro con la entidad afectada (campaña, job, configuración) y restringir el acceso al módulo según el rol del usuario (Tabla Usuarios).",
+    ],
+  },
+
+  // QA y cutover — cierra el combo Cloud SQL + SSO con una validación end-to-end
+  // antes del switch definitivo. Hace explícito lo que antes vivía implícito en
+  // sql-app y auth-app, y es donde se ejecuta el switch + baja de BigQuery.
+  {
+    id: "cutover-qa",
+    title: "QA y cutover (Cloud SQL + SSO)",
+    group: "app",
+    startWeek: 8,
+    endWeek: 8,
+    status: "planned",
+    dependsOn: ["sql-app", "auth-app"],
+    detail: [
+      "Pruebas de regresión end-to-end del combo Cloud SQL + SSO antes del switch definitivo.",
+      "Validar la paridad de datos tras el período de doble escritura.",
+      "Validar el acceso vía SSO y la autorización contra la Tabla Usuarios en todos los módulos.",
+      "Switch definitivo de lecturas a Cloud SQL y baja de los datasets de BigQuery una vez confirmada la estabilidad.",
+    ],
+  },
+
+  // Alertas — hoy la lógica vive en el cliente (AlertsContext) cruzando OSS (BQ)
+  // con GAds (Google Sheets), solo canal Teams y sin persistencia. El diagrama
+  // apunta a lógica server-side + Tabla Alertas (modelada en sql-datos) + canales.
+  // El trabajo arrancó en junio (exploración + MVP, ya hecho); en julio se pausa
+  // y se retoma tras S2 agosto para el cierre (pruebas finales e integración).
+  {
+    id: "alertas-mvp",
+    title: "Exploración y MVP de alertas",
+    group: "app",
+    startWeek: 0,
+    endWeek: 3,
+    status: "done",
+    detail: [
+      "Explorar y cruzar los datos para alertas (OSS en BigQuery + performance de GAds en Google Sheets).",
+      "Delinear los tipos de alerta: no_activity, budget_underexecution y budget_mismatch.",
+      "MVP de la lógica de detección en el cliente (AlertsContext) con notificación por Teams (webhook).",
+      "Validar el flujo con datos reales, con la nav de Alertas oculta tras un flag.",
+    ],
+  },
+  {
+    id: "alertas-final",
+    title: "Integración de alertas",
+    group: "app",
+    startWeek: 10,
+    endWeek: 11,
+    status: "planned",
+    detail: [
+      "Mover la lógica de detección de alertas al server-side (hoy vive en el cliente, AlertsContext).",
+      "Persistir las alertas en la Tabla Alertas de Cloud SQL (modelada en 'Esquema y migración de datos').",
+      "Pruebas finales end-to-end de los tres tipos de alerta y de los canales de notificación.",
+      "Habilitar la nav de Alertas.",
+    ],
+  },
+  {
+    id: "alertas-canales",
+    title: "Notificaciones de alertas (Teams y Gmail)",
+    group: "app",
+    startWeek: 9,
+    endWeek: 11,
+    status: "planned",
+    detail: [
+      "Implementar el envío de notificaciones de alertas por Microsoft Teams (webhook) y por Gmail (correo).",
+      "Definir las plantillas de mensaje por canal y por tipo de alerta.",
+      "Configurar credenciales y destinatarios por canal (webhook de Teams, cuenta de envío de Gmail).",
+      "Probar la entrega end-to-end de los tres tipos de alerta en ambos canales.",
+    ],
+  },
+
+  // Extracción de documentos — hoy los documentos se traen on-demand desde OSS
+  // (/api/oss/campaign-documents) y los media plans .xlsx se parsean al vuelo;
+  // GCS solo se usa para subir creativos al enviar. El diagrama apunta a una
+  // Cloud Function batch que procesa documentos → GCS. Estas épicas cubren ese
+  // pipeline (S4 jun – S2 jul). Pendiente de decisión: batch vs on-demand final.
+  {
+    id: "doc-infra",
+    title: "Aprovisionar extracción de documentos",
+    group: "infra",
+    startWeek: 3,
+    endWeek: 3,
+    status: "planned",
+    detail: [
+      "Crear la Cloud Function de extracción de documentos (HTTP) y su disparador en Cloud Scheduler.",
+      "Aprovisionar el bucket de GCS de destino con una Service Account dedicada y permisos mínimos.",
+      "Guardar las credenciales y la configuración de acceso a OSS en Secret Manager.",
+    ],
+  },
+  {
+    id: "doc-pipeline",
+    title: "Pipeline de extracción de documentos",
+    group: "app",
+    startWeek: 4,
+    endWeek: 5,
+    status: "planned",
+    dependsOn: ["doc-infra"],
+    detail: [
+      "Implementar la extracción batch de documentos de campaña desde OSS hacia GCS.",
+      "Parsear y normalizar los media plans (.xlsx) dentro del proceso batch.",
+      "Hacer la ingesta idempotente y registrar el resultado de cada corrida (sync log).",
+      "Validar la paridad contra el flujo on-demand actual antes de cambiar el origen.",
+    ],
+  },
+
+  // Completar integraciones de plataforma — features parcialmente implementadas
+  // que el diagrama objetivo asume como nativas y consolidadas. Hoy: TikTok en
+  // standby, Meta parte por n8n, parser de media plans solo para CL y alertas
+  // dependiendo de Google Sheets. Estas épicas cierran esa transición.
+  {
+    id: "parser-paises",
+    title: "Parser de media plan CO/PE",
+    group: "app",
+    startWeek: 4,
+    endWeek: 5,
     status: "in-progress",
-    dependsOn: ["infra-mcp"],
-    detail:
-      "Sistema de notificaciones in-app en tiempo real para los eventos relevantes: aprobaciones, menciones y cambios de estado.",
+    detail: [
+      "Extender el parser de media plans (.xlsx) a Colombia y Perú (hoy solo Chile está soportado).",
+      "Mapear las diferencias de formato y columnas de cada mercado.",
+      "Validar la extracción contra media plans reales de CO y PE.",
+      "Integrar el parseo multi-país al flujo de documentos existente.",
+    ],
   },
   {
-    id: "xp-jira",
-    title: "Integración con Jira",
-    group: "experience",
-    startMonth: 4,
-    endMonth: 7,
+    id: "alertas-sheets",
+    title: "Alertas sin dependencia de Sheets",
+    group: "app",
+    startWeek: 8,
+    endWeek: 9,
     status: "planned",
-    dependsOn: ["xp-notif"],
-    detail:
-      "Integración bidireccional con Jira para crear y sincronizar tareas desde la plataforma sin salir del flujo de trabajo.",
+    detail: [
+      "Migrar el origen de datos de GAds de las alertas: de Google Sheets (legacy) a la fuente nativa (BigQuery / Cloud SQL).",
+      "Eliminar la dependencia de las hojas de cálculo en la lógica de detección.",
+      "Validar que los tres tipos de alerta siguen funcionando con la nueva fuente.",
+      "Dejar el origen de datos listo para la integración final de alertas (server-side + persistencia).",
+    ],
   },
   {
-    id: "xp-campaign",
-    title: "Rendimiento de campañas",
-    group: "experience",
-    startMonth: 6,
-    endMonth: 9,
+    id: "tiktok-nativo",
+    title: "Deploy nativo de TikTok",
+    group: "app",
+    startWeek: 4,
+    endWeek: 5,
     status: "planned",
-    detail:
-      "Panel de rendimiento de campañas con métricas agregadas y comparativas por período para el equipo de marketing.",
+    detail: [
+      "Retomar el flujo de deploy nativo de TikTok (rama feat/tiktok-native-flow, hoy en standby).",
+      "Completar la creación de campañas vía la Marketing API de TikTok, reemplazando el paso legacy.",
+      "Cubrir los tipos de campaña en alcance y el manejo de errores y reintentos.",
+      "Validar end-to-end con cuentas reales por mercado (CL/CO/PE).",
+    ],
   },
   {
-    id: "xp-templates",
-    title: "Editor de plantillas de brief",
-    group: "experience",
-    startMonth: 9,
-    endMonth: 11,
+    id: "meta-n8n",
+    title: "Migrar Meta fuera de n8n",
+    group: "app",
+    startWeek: 3,
+    endWeek: 4,
+    status: "in-progress",
+    detail: [
+      "Migrar el flujo de Meta que aún pasa por n8n a los endpoints propios de la app.",
+      "Consolidar la creación y actualización de campañas de Meta en la Marketing API nativa.",
+      "Retirar los webhooks legacy de n8n una vez validada la paridad.",
+      "Probar el envío end-to-end por mercado.",
+    ],
+  },
+
+  // Seguridad — auditoría de código y ethical hacking a cargo de Falabella
+  // (Jul S1-S3, en paralelo), seguidas de la corrección de los hallazgos
+  // (Jul S3-S4). La corrección depende de ambas auditorías y se solapa a
+  // propósito con su cierre porque arranca a medida que aparecen los hallazgos.
+  {
+    id: "sec-code-audit",
+    title: "Chequeo de seguridad del código",
+    group: "app",
+    startWeek: 4,
+    endWeek: 6,
     status: "planned",
-    dependsOn: ["xp-jira"],
-    detail:
-      "Editor mejorado de plantillas de brief con bloques reutilizables, variables y vista previa en vivo.",
+    owner: "Falabella",
+    detail: [
+      "Revisión de seguridad sobre el código de la aplicación (análisis estático y revisión manual).",
+      "Identificar vulnerabilidades, malas prácticas y manejo inseguro de credenciales o datos.",
+      "Documentar los hallazgos priorizados por severidad.",
+    ],
+  },
+  {
+    id: "sec-ethical-hacking",
+    title: "Ethical hacking sobre la app",
+    group: "app",
+    startWeek: 4,
+    endWeek: 6,
+    status: "planned",
+    owner: "Falabella",
+    detail: [
+      "Ejercicio de ethical hacking / pentest sobre la aplicación desplegada.",
+      "Probar vectores de acceso, autenticación, autorización y exposición de datos.",
+      "Documentar los hallazgos priorizados por severidad.",
+    ],
+  },
+  {
+    id: "sec-fixes",
+    title: "Corrección de hallazgos de seguridad",
+    group: "app",
+    startWeek: 6,
+    endWeek: 7,
+    status: "planned",
+    dependsOn: ["sec-code-audit", "sec-ethical-hacking"],
+    detail: [
+      "Corregir los puntos de seguridad detectados por el chequeo de código y el ethical hacking.",
+      "Priorizar por severidad y validar cada corrección.",
+      "Reverificar los hallazgos críticos con quien ejecutó la auditoría.",
+    ],
   },
 ];
 
-export type TimelineMonth = { index: number; label: string };
-export type TimelineQuarter = { label: string; startIndex: number; span: number };
+export type TimelineWeek = { index: number; label: string };
+export type TimelineMonth = { label: string; startIndex: number; span: number };
 
 export type Timeline = {
+  weeks: TimelineWeek[];
   months: TimelineMonth[];
-  quarters: TimelineQuarter[];
-  totalMonths: number;
+  totalWeeks: number;
 };
 
-// Builds the month/quarter axis metadata from the start config.
+// Builds the week axis plus the month groupings from the start config. Each
+// month is a fixed block of WEEKS_PER_MONTH weeks; week labels reset per month
+// (S1..S{WEEKS_PER_MONTH}).
 export function buildTimeline(): Timeline {
-  const totalMonths = TIMELINE_QUARTERS * 3;
+  const totalWeeks = TIMELINE_MONTHS * WEEKS_PER_MONTH;
+  const weeks: TimelineWeek[] = [];
   const months: TimelineMonth[] = [];
-  const quarters: TimelineQuarter[] = [];
 
-  for (let i = 0; i < totalMonths; i++) {
-    const monthOfYear = (TIMELINE_START.month + i) % 12;
-    months.push({ index: i, label: MONTH_ABBR[monthOfYear] });
+  for (let i = 0; i < totalWeeks; i++) {
+    weeks.push({ index: i, label: `S${(i % WEEKS_PER_MONTH) + 1}` });
   }
 
-  for (let q = 0; q < TIMELINE_QUARTERS; q++) {
-    const absoluteMonth = TIMELINE_START.month + q * 3;
+  for (let m = 0; m < TIMELINE_MONTHS; m++) {
+    const absoluteMonth = TIMELINE_START.month + m;
+    const monthOfYear = absoluteMonth % 12;
     const year = TIMELINE_START.year + Math.floor(absoluteMonth / 12);
-    const quarterNumber = Math.floor((absoluteMonth % 12) / 3) + 1;
-    quarters.push({
-      label: `Q${quarterNumber} '${String(year % 100).padStart(2, "0")}`,
-      startIndex: q * 3,
-      span: 3,
+    months.push({
+      label: `${MONTH_ABBR[monthOfYear]} '${String(year % 100).padStart(2, "0")}`,
+      startIndex: m * WEEKS_PER_MONTH,
+      span: WEEKS_PER_MONTH,
     });
   }
 
-  return { months, quarters, totalMonths };
+  return { weeks, months, totalWeeks };
 }
 
-// Human-readable "MMM YYYY" label for a month index relative to the start.
-export function formatMonthLabel(index: number): string {
-  const absolute = TIMELINE_START.month + index;
+// Human-readable "MMM YYYY · SN" label for a week index relative to the start.
+export function formatWeekLabel(index: number): string {
+  const monthsFromStart = Math.floor(index / WEEKS_PER_MONTH);
+  const weekInMonth = (index % WEEKS_PER_MONTH) + 1;
+  const absolute = TIMELINE_START.month + monthsFromStart;
   const year = TIMELINE_START.year + Math.floor(absolute / 12);
   const monthOfYear = ((absolute % 12) + 12) % 12;
-  return `${MONTH_ABBR[monthOfYear]} ${year}`;
+  return `${MONTH_ABBR[monthOfYear]} ${year} · S${weekInMonth}`;
 }
 
-// Fractional month offset of a date relative to the timeline start. Used to
-// position the "today" marker. Returns null when the date is out of range.
-export function monthOffsetOf(date: Date, totalMonths: number): number | null {
+// Fractional week offset of a date relative to the timeline start. Used to
+// position the "today" marker. Weeks are nominal (WEEKS_PER_MONTH per month),
+// so a date maps to monthOffset * WEEKS_PER_MONTH. Returns null when out of range.
+export function weekOffsetOf(date: Date, totalWeeks: number): number | null {
   const startAbsolute = TIMELINE_START.year * 12 + TIMELINE_START.month;
   const dateAbsolute = date.getFullYear() * 12 + date.getMonth();
   const daysInMonth = new Date(
@@ -316,9 +483,11 @@ export function monthOffsetOf(date: Date, totalMonths: number): number | null {
     date.getMonth() + 1,
     0,
   ).getDate();
-  const offset = dateAbsolute - startAbsolute + (date.getDate() - 1) / daysInMonth;
+  const monthOffset =
+    dateAbsolute - startAbsolute + (date.getDate() - 1) / daysInMonth;
+  const offset = monthOffset * WEEKS_PER_MONTH;
 
-  if (offset < 0 || offset > totalMonths) {
+  if (offset < 0 || offset > totalWeeks) {
     return null;
   }
 
@@ -332,23 +501,41 @@ export type LaneLayout = {
 
 // Greedy interval packing: places epics into the fewest horizontal lanes so
 // non-overlapping epics share a row, mirroring the reference Gantt layout.
+// Constraint: a dependent epic is always placed on a lane strictly below all of
+// its in-group dependencies, so dependency arrows always flow downward.
 export function packLanes(epics: RoadmapEpic[]): LaneLayout {
-  const ordered = [...epics].sort((a, b) => a.startMonth - b.startMonth);
+  const inGroup = new Set(epics.map((e) => e.id));
+  // Sort by start week so an epic's in-group dependencies (which start earlier)
+  // are placed first and their lanes are known when the dependent is placed.
+  const ordered = [...epics].sort((a, b) => a.startWeek - b.startWeek);
   const laneEnds: number[] = [];
   const laneOf = new Map<string, number>();
 
   for (const epic of ordered) {
+    // Force the epic below its in-group dependencies' lanes.
+    let minLane = 0;
+    for (const depId of epic.dependsOn ?? []) {
+      if (!inGroup.has(depId)) continue;
+      const depLane = laneOf.get(depId);
+      if (depLane !== undefined) minLane = Math.max(minLane, depLane + 1);
+    }
+
     let placed = false;
-    for (let lane = 0; lane < laneEnds.length; lane++) {
-      if (epic.startMonth > laneEnds[lane]) {
-        laneEnds[lane] = epic.endMonth;
+    for (let lane = minLane; lane < laneEnds.length; lane++) {
+      if (epic.startWeek > laneEnds[lane]) {
+        laneEnds[lane] = epic.endWeek;
         laneOf.set(epic.id, lane);
         placed = true;
         break;
       }
     }
     if (!placed) {
-      laneEnds.push(epic.endMonth);
+      // Grow up to minLane first; skipped lanes stay free (-Infinity) so other
+      // epics can still reuse them.
+      while (laneEnds.length < minLane) {
+        laneEnds.push(-Infinity);
+      }
+      laneEnds.push(epic.endWeek);
       laneOf.set(epic.id, laneEnds.length - 1);
     }
   }
