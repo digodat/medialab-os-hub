@@ -5,6 +5,14 @@ import {
   Bars3BottomLeftIcon,
   ShieldCheckIcon,
   BookOpenIcon,
+  BoltIcon,
+  GlobeAltIcon,
+  CheckBadgeIcon,
+  BellAlertIcon,
+  ClipboardDocumentCheckIcon,
+  CircleStackIcon,
+  PaperAirplaneIcon,
+  ArrowRightIcon,
 } from "@heroicons/react/24/outline";
 import { CoreAnimation } from "@/components/landing/core-animation";
 import { ScrollHint } from "@/components/landing/scroll-hint";
@@ -14,6 +22,75 @@ const SECTIONS = [
   { href: "/roadmap",      Icon: Bars3BottomLeftIcon,  label: "Hoja de Ruta" },
   { href: "/security",     Icon: ShieldCheckIcon,     label: "Seguridad" },
   { href: "/knowledge",    Icon: BookOpenIcon,         label: "Conocimiento" },
+];
+
+// Below-the-fold overview content. Sourced from the hub sections (architecture
+// diagram, roadmap, security catalog) and the falabella-medialab-os codebase.
+const METRICS = [
+  { value: "3", label: "Mercados — Chile, Colombia y Perú" },
+  { value: "3", label: "Plataformas — Google Ads, Meta y TikTok" },
+  { value: "7", label: "Tipos de campaña soportados" },
+];
+
+const STEPS = [
+  {
+    Icon: ClipboardDocumentCheckIcon,
+    title: "Planificación",
+    body: "Las estrategias de medios se definen y aprueban en OSS, el sistema de planificación de Falabella.",
+  },
+  {
+    Icon: CircleStackIcon,
+    title: "Ingesta de datos",
+    body: "Procesos automáticos extraen y consolidan las campañas y su performance en una base de datos central.",
+  },
+  {
+    Icon: PaperAirplaneIcon,
+    title: "Despliegue",
+    body: "El operador completa un formulario y la app crea las campañas en cada plataforma, paso a paso y de forma auditable.",
+  },
+  {
+    Icon: BellAlertIcon,
+    title: "Monitoreo",
+    body: "La performance se consolida en un solo lugar y las alertas avisan por Teams y Gmail ante desvíos o inactividad.",
+  },
+];
+
+const CAPABILITIES = [
+  {
+    Icon: BoltIcon,
+    title: "Velocidad operativa",
+    body: "Lo que antes implicaba configurar campaña por campaña en cada plataforma ahora se dispara desde un único flujo guiado.",
+  },
+  {
+    Icon: GlobeAltIcon,
+    title: "Escala regional",
+    body: "Una misma operación cubre los tres mercados, respetando las cuentas y la nomenclatura de cada país.",
+  },
+  {
+    Icon: CheckBadgeIcon,
+    title: "Consistencia",
+    body: "La configuración y la nomenclatura estandarizadas reducen los errores manuales y el retrabajo.",
+  },
+  {
+    Icon: ShieldCheckIcon,
+    title: "Gobernanza",
+    body: "Cada acción queda registrada y toda campaña nace en pausa, bajo control humano antes de invertir.",
+  },
+];
+
+const SECURITY_POINTS = [
+  "Las campañas siempre se crean en pausa: la inversión se activa de forma manual.",
+  "Credenciales y tokens viven en Secret Manager, nunca en el código ni en el navegador.",
+  "Cada componente opera con permisos mínimos mediante Service Accounts dedicadas.",
+  "Las operaciones sensibles se validan antes de ejecutarse contra las plataformas.",
+];
+
+const ROADMAP_POINTS = [
+  "Migración de la base de datos a Cloud SQL (PostgreSQL).",
+  "Acceso corporativo con SSO y roles por usuario.",
+  "Módulo de logs de actividad para auditoría completa.",
+  "Alertas e integraciones nativas (TikTok y Meta) consolidadas.",
+  "Auditoría de seguridad y ethical hacking a cargo de Falabella.",
 ];
 
 export default function HomePage() {
@@ -71,10 +148,10 @@ export default function HomePage() {
               <Link
                 key={href}
                 href={href}
-                className="group flex flex-col items-center justify-center p-4 md:p-5 border border-foreground/10 hover:border-brand/20 transition-all duration-300 rounded-xl bg-white/20 shadow-md shadow-foreground/5 hover:shadow-lg hover:shadow-foreground/10"
+                className="group flex flex-col items-center justify-center p-4 md:p-5 border-2 border-foreground/10 hover:border-brand/50 transition-all duration-300 rounded-xl bg-white/60 backdrop-blur-sm shadow-md shadow-foreground/5 hover:shadow-lg hover:shadow-foreground/10"
               >
-                <Icon className="h-5 w-5 text-foreground/40 group-hover:text-brand mb-2 transition-colors" />
-                <span className="text-xs font-bold tracking-widest text-foreground/40 group-hover:text-foreground transition-colors uppercase">
+                <Icon className="h-5 w-5 text-foreground/70 group-hover:text-brand mb-2 transition-colors" />
+                <span className="text-xs font-bold tracking-widest text-foreground/70 group-hover:text-foreground transition-colors uppercase">
                   {label}
                 </span>
               </Link>
@@ -87,96 +164,187 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Below-the-fold content: revealed on scroll. Newspaper-style columns. */}
-      <section id="home-more" className="min-h-dvh py-16 md:py-24">
-        <header className="mb-10 border-y border-foreground/15 py-6 text-center">
-          <h2 className="section-title text-4xl md:text-5xl font-semibold tracking-tight text-foreground">
-            Lorem Ipsum
+      {/* Below-the-fold content: executive overview revealed on scroll. */}
+      <section id="home-more" className="py-16 md:py-24">
+        <header className="mb-12 border-y border-foreground/15 py-8 text-center">
+          <h2 className="font-heading text-4xl md:text-5xl font-semibold tracking-tight text-foreground">
+            Una sola plataforma para operar los medios
           </h2>
-          <p className="mt-2 text-xs uppercase tracking-[0.25em] text-foreground/40">
-            Edición especial · Medialab OS
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-foreground/65">
+            MediaLab OS centraliza y automatiza el despliegue de campañas
+            publicitarias de Falabella en Google Ads, Meta y TikTok.
           </p>
         </header>
 
-        <div className="columns-1 gap-8 text-justify md:columns-2 lg:columns-3 [column-rule:1px_solid_var(--border)]">
-          <article className="mb-6 break-inside-avoid">
-            <h3 className="section-title mb-2 text-2xl font-semibold tracking-tight text-foreground">
-              De finibus bonorum
-            </h3>
-            <p className="text-sm leading-relaxed text-foreground/70 first-letter:float-left first-letter:mr-2 first-letter:font-heading first-letter:text-5xl first-letter:leading-[0.8] first-letter:text-foreground">
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do
-              eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut
-              enim ad minim veniam, quis nostrud exercitation ullamco laboris
-              nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in
-              reprehenderit in voluptate velit esse cillum dolore.
-            </p>
-          </article>
-
-          <p className="mb-6 break-inside-avoid text-sm leading-relaxed text-foreground/70">
-            Excepteur sint occaecat cupidatat non proident, sunt in culpa qui
-            officia deserunt mollit anim id est laborum. Curabitur pretium
-            tincidunt lacus, nulla gravida orci a odio. Nullam varius, turpis et
-            commodo pharetra, est eros bibendum elit, nec luctus magna felis
-            sollicitudin mauris.
+        {/* Lead — the pitch */}
+        <div className="mx-auto max-w-3xl space-y-5">
+          <p className="text-base leading-relaxed text-foreground/75 first-letter:float-left first-letter:mr-2 first-letter:font-heading first-letter:text-6xl first-letter:leading-[0.8] first-letter:text-brand">
+            MediaLab OS es la herramienta interna que automatiza el despliegue de
+            campañas publicitarias de Falabella en Google Ads, Meta y TikTok.
+            Toma las estrategias ya planificadas en OSS y le permite al equipo de
+            medios lanzarlas en las tres plataformas —y en los tres mercados de
+            la región— desde un único flujo guiado, sin saltar entre cuentas ni
+            configurar cada campaña a mano.
           </p>
-
-          <article className="mb-6 break-inside-avoid">
-            <h3 className="section-title mb-2 text-xl font-semibold tracking-tight text-foreground">
-              Quis autem velum
-            </h3>
-            <p className="text-sm leading-relaxed text-foreground/70">
-              Integer in mauris eu nibh euismod gravida. Duis ac tellus et risus
-              vulputate vehicula. Donec lobortis risus a elit. Etiam tempor.
-              Praesent eu nulla at sem molestie sodales. Mauris condimentum
-              nulla luctus libero porttitor placerat.
-            </p>
-          </article>
-
-          <p className="mb-6 break-inside-avoid text-sm leading-relaxed text-foreground/70">
-            Sed augue ipsum, egestas nec, vestibulum et, malesuada adipiscing,
-            dui. Vestibulum facilisis, purus nec pulvinar iaculis, ligula mi
-            congue nunc, vitae euismod ligula urna in dolor. Nam sodales mi vitae
-            dolor ullamcorper et vulputate enim accumsan.
-          </p>
-
-          <article className="mb-6 break-inside-avoid">
-            <h3 className="section-title mb-2 text-xl font-semibold tracking-tight text-foreground">
-              Neque porro quisquam
-            </h3>
-            <p className="text-sm leading-relaxed text-foreground/70">
-              Morbi in sem quis dui placerat ornare. Pellentesque odio nisi,
-              euismod in, pharetra a, ultricies in, diam. Sed arcu. Cras
-              consequat. Praesent dapibus, neque id cursus faucibus, tortor neque
-              egestas augue, eu vulputate magna eros eu erat.
-            </p>
-          </article>
-
-          <p className="mb-6 break-inside-avoid text-sm leading-relaxed text-foreground/70">
-            Aliquam erat volutpat. Nam dui mi, tincidunt quis, accumsan porttitor,
-            facilisis luctus, metus. Phasellus ultrices nulla quis nibh. Quisque
-            a lectus. Donec consectetuer ligula vulputate sem tristique cursus.
-            Nam nulla quam, gravida non, commodo a, sodales sit amet, nisi.
-          </p>
-
-          <article className="mb-6 break-inside-avoid">
-            <h3 className="section-title mb-2 text-xl font-semibold tracking-tight text-foreground">
-              Temporibus autem
-            </h3>
-            <p className="text-sm leading-relaxed text-foreground/70">
-              Pellentesque habitant morbi tristique senectus et netus et
-              malesuada fames ac turpis egestas. Proin pharetra nonummy pede.
-              Mauris et orci. Aenean nec lorem. In porttitor. Donec laoreet nonummy
-              augue. Suspendisse dui purus, scelerisque at, vulputate vitae.
-            </p>
-          </article>
-
-          <p className="mb-6 break-inside-avoid text-sm leading-relaxed text-foreground/70">
-            Fusce aliquet pede non pede. Suspendisse dapibus lorem pellentesque
-            magna. Integer nulla. Donec blandit feugiat ligula. Donec hendrerit,
-            felis et imperdiet euismod, purus ipsum pretium metus, in lacinia
-            nulla nisl eget sapien. Donec ut est in lectus consequat consequat.
+          <p className="text-base leading-relaxed text-foreground/65">
+            El objetivo es simple: convertir un proceso manual, repetitivo y
+            propenso a errores en una operación rápida, consistente y trazable.
+            Cada envío queda registrado y, por diseño, las campañas siempre se
+            crean en pausa: ninguna inversión se activa sin una validación humana
+            de por medio.
           </p>
         </div>
+
+        {/* Metrics strip */}
+        <div className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {METRICS.map((metric) => (
+            <div
+              key={metric.label}
+              className="metric-glass-card flex flex-col rounded-2xl px-5 py-6"
+            >
+              <span className="font-heading text-4xl font-semibold tracking-tight text-brand">
+                {metric.value}
+              </span>
+              <span className="mt-2 text-sm leading-snug text-foreground/60">
+                {metric.label}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* How it works */}
+        <div className="mt-20">
+          <p className="text-xs uppercase tracking-[0.25em] text-foreground/40">
+            Cómo funciona
+          </p>
+          <h3 className="mt-2 font-heading text-2xl font-semibold tracking-tight text-foreground">
+            De la estrategia a la campaña en vivo
+          </h3>
+          <ol className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            {STEPS.map((step, index) => (
+              <li
+                key={step.title}
+                className="relative rounded-2xl border border-foreground/10 bg-white/40 p-5 shadow-sm backdrop-blur-sm"
+              >
+                <div className="flex items-center justify-between">
+                  <step.Icon className="h-6 w-6 text-brand" />
+                  <span className="font-heading text-sm font-semibold text-foreground/25">
+                    0{index + 1}
+                  </span>
+                </div>
+                <p className="mt-4 text-base font-semibold tracking-tight text-foreground">
+                  {step.title}
+                </p>
+                <p className="mt-1.5 text-sm leading-relaxed text-foreground/60">
+                  {step.body}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        {/* Business value */}
+        <div className="mt-20">
+          <p className="text-xs uppercase tracking-[0.25em] text-foreground/40">
+            Qué aporta al negocio
+          </p>
+          <h3 className="mt-2 font-heading text-2xl font-semibold tracking-tight text-foreground">
+            Más velocidad, menos riesgo
+          </h3>
+          <div className="mt-8 grid gap-5 sm:grid-cols-2">
+            {CAPABILITIES.map((capability) => (
+              <div
+                key={capability.title}
+                className="flex gap-4 rounded-2xl border border-foreground/10 bg-white/40 p-5 shadow-sm backdrop-blur-sm"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-subtle">
+                  <capability.Icon className="h-5 w-5 text-brand" />
+                </span>
+                <div>
+                  <p className="text-base font-semibold tracking-tight text-foreground">
+                    {capability.title}
+                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-foreground/60">
+                    {capability.body}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Security + Roadmap */}
+        <div className="mt-20 grid gap-6 lg:grid-cols-2">
+          <div className="flex flex-col rounded-2xl border border-foreground/10 bg-white/40 p-6 shadow-sm backdrop-blur-sm">
+            <div className="flex items-center gap-2.5">
+              <ShieldCheckIcon className="h-5 w-5 text-brand" />
+              <h3 className="font-heading text-xl font-semibold tracking-tight text-foreground">
+                Seguridad por diseño
+              </h3>
+            </div>
+            <ul className="mt-5 space-y-3">
+              {SECURITY_POINTS.map((point) => (
+                <li
+                  key={point}
+                  className="flex gap-2.5 text-sm leading-relaxed text-foreground/65"
+                >
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
+                  {point}
+                </li>
+              ))}
+            </ul>
+            <Link
+              href="/security"
+              className="group mt-6 inline-flex items-center gap-1.5 self-start text-sm font-semibold text-brand"
+            >
+              Ver el estado de seguridad
+              <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+
+          <div className="flex flex-col rounded-2xl border border-foreground/10 bg-white/40 p-6 shadow-sm backdrop-blur-sm">
+            <div className="flex items-center gap-2.5">
+              <Bars3BottomLeftIcon className="h-5 w-5 text-brand" />
+              <h3 className="font-heading text-xl font-semibold tracking-tight text-foreground">
+                Hacia dónde va
+              </h3>
+            </div>
+            <ul className="mt-5 space-y-3">
+              {ROADMAP_POINTS.map((point) => (
+                <li
+                  key={point}
+                  className="flex gap-2.5 text-sm leading-relaxed text-foreground/65"
+                >
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
+                  {point}
+                </li>
+              ))}
+            </ul>
+            <Link
+              href="/roadmap"
+              className="group mt-6 inline-flex items-center gap-1.5 self-start text-sm font-semibold text-brand"
+            >
+              Ver la hoja de ruta
+              <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Contextual aside about OSS — secondary, but readable. */}
+        <aside className="mt-20 rounded-2xl border border-foreground/10 bg-white/40 p-6 shadow-sm backdrop-blur-sm">
+          <h4 className="text-sm font-semibold tracking-tight text-foreground/75">
+            ¿Qué es OSS y cómo nos integramos?
+          </h4>
+          <p className="mt-3 text-sm leading-relaxed text-foreground/60">
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do
+            eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim
+            ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut
+            aliquip ex ea commodo consequat. Duis aute irure dolor in
+            reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
+            pariatur.
+          </p>
+        </aside>
+
       </section>
       </main>
     </>
