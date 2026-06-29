@@ -80,6 +80,7 @@ type TaskListProps = {
 type FindingModalState = {
   mode: "create" | "edit";
   id?: string;
+  code?: string;
   values: FindingFormValues;
 };
 
@@ -546,7 +547,6 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
     setFindingModal({
       mode: "create",
       values: {
-        code: "",
         severity: "MEDIO",
         category: "platform",
         title: "",
@@ -561,8 +561,8 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
     setFindingModal({
       mode: "edit",
       id: finding.id,
+      code: finding.code,
       values: {
-        code: finding.code,
         severity: finding.severity,
         category: finding.category,
         title: finding.title,
@@ -612,7 +612,7 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
     <>
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h3 className="section-title text-base font-semibold tracking-tight text-foreground">
+          <h3 className="section-title text-[2rem] leading-none font-semibold tracking-tight text-foreground">
             Tareas
           </h3>
           <div className="flex flex-wrap items-center gap-4">
@@ -701,7 +701,7 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
                   type="button"
                   aria-pressed={isActive}
                   onClick={() => toggleStatus(status)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all ${style.bg} ${style.text} ${
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase transition-all ${style.bg} ${style.text} ${
                     isActive
                       ? "ring-2 ring-current ring-offset-1 ring-offset-[var(--app-background)]"
                       : statusFilter !== null
@@ -709,7 +709,6 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
                         : "hover:opacity-80"
                   }`}
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} />
                   {count} {status}
                 </button>
               );
@@ -837,7 +836,7 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
                                   />
                                   <span>
                                     <span className="font-mono text-foreground/35 mr-2">
-                                      #{String(finding.number).padStart(2, "0")}
+                                      {finding.code}
                                     </span>
                                     <HighlightText
                                       text={finding.title}
@@ -1014,6 +1013,7 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
       <FindingModal
         open={findingModal !== null}
         mode={findingModal?.mode ?? "create"}
+        findingCode={findingModal?.code}
         initialValues={findingModal?.values}
         isSubmitting={isFindingPending}
         showSuccess={findingSuccess}

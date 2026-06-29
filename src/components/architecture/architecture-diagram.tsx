@@ -12,7 +12,6 @@ import {
   getSmoothStepPath,
   Handle,
   MarkerType,
-  NodeToolbar,
   Position,
   useEdgesState,
   useNodesState,
@@ -36,8 +35,6 @@ import type { ComponentType, MouseEvent as ReactMouseEvent, SVGProps } from "rea
 import { cn } from "@/lib/utils";
 
 type IconType = ComponentType<SVGProps<SVGSVGElement>>;
-
-type ToolbarAlign = "start" | "center" | "end";
 
 // rationaleTitle / rationale render an extra "Why this product?" section in the
 // popup, explaining why the tool was chosen over alternatives.
@@ -73,29 +70,6 @@ type BrandsData = {
   description: string;
   brands: { name: string; logo: string }[];
 };
-
-// Popup placement is derived from each node's real position (provided by React
-// Flow on every render), so popups always open toward the inside of the canvas
-// and never get clipped by its edges. Computing it at render time (instead of
-// precomputing into node data) also keeps it correct across Fast Refresh.
-const LAYOUT_MID_Y = 320;
-const LEFT_EDGE_X = 260;
-const RIGHT_EDGE_X = 940;
-
-function toolbarPlacement(
-  x: number,
-  y: number,
-  w?: number,
-  h?: number,
-): { position: Position; align: ToolbarAlign } {
-  const centerX = x + (w ?? 0) / 2;
-  const centerY = y + (h ?? 0) / 2;
-  return {
-    position: centerY < LAYOUT_MID_Y ? Position.Bottom : Position.Top,
-    align:
-      centerX < LEFT_EDGE_X ? "start" : centerX > RIGHT_EDGE_X ? "end" : "center",
-  };
-}
 
 // Invisible handles on all four sides so edges can attach from any direction
 const HANDLE_SIDES = [
@@ -168,17 +142,9 @@ function Popover({
   );
 }
 
-function ServiceNode({
-  data,
-  selected,
-  positionAbsoluteX,
-  positionAbsoluteY,
-  width,
-  height,
-}: NodeProps) {
+function ServiceNode({ data, selected }: NodeProps) {
   const d = data as ServiceData;
   const Icon = d.Icon;
-  const placement = toolbarPlacement(positionAbsoluteX, positionAbsoluteY, width, height);
   return (
     <div
       className={cn(
@@ -188,19 +154,6 @@ function ServiceNode({
       )}
     >
       <NodeHandles />
-      <NodeToolbar
-        isVisible={selected}
-        position={placement.position}
-        align={placement.align}
-        offset={10}
-      >
-        <Popover
-          title={d.title}
-          description={d.description}
-          rationaleTitle={d.rationaleTitle}
-          rationale={d.rationale}
-        />
-      </NodeToolbar>
       {d.logo ? (
         <img src={d.logo} alt="" className="h-5 w-auto shrink-0 object-contain" />
       ) : Icon ? (
@@ -218,16 +171,8 @@ function ServiceNode({
   );
 }
 
-function StorageNode({
-  data,
-  selected,
-  positionAbsoluteX,
-  positionAbsoluteY,
-  width,
-  height,
-}: NodeProps) {
+function StorageNode({ data, selected }: NodeProps) {
   const d = data as StorageData;
-  const placement = toolbarPlacement(positionAbsoluteX, positionAbsoluteY, width, height);
   return (
     <div
       className={cn(
@@ -237,19 +182,6 @@ function StorageNode({
       )}
     >
       <NodeHandles />
-      <NodeToolbar
-        isVisible={selected}
-        position={placement.position}
-        align={placement.align}
-        offset={10}
-      >
-        <Popover
-          title={d.title}
-          description={d.description}
-          rationaleTitle={d.rationaleTitle}
-          rationale={d.rationale}
-        />
-      </NodeToolbar>
       {d.logo ? (
         <img src={d.logo} alt="" className="h-5 w-auto shrink-0 object-contain" />
       ) : null}
@@ -260,16 +192,8 @@ function StorageNode({
   );
 }
 
-function BrandsNode({
-  data,
-  selected,
-  positionAbsoluteX,
-  positionAbsoluteY,
-  width,
-  height,
-}: NodeProps) {
+function BrandsNode({ data, selected }: NodeProps) {
   const d = data as BrandsData;
-  const placement = toolbarPlacement(positionAbsoluteX, positionAbsoluteY, width, height);
   return (
     <div
       className={cn(
@@ -279,14 +203,6 @@ function BrandsNode({
       )}
     >
       <NodeHandles />
-      <NodeToolbar
-        isVisible={selected}
-        position={placement.position}
-        align={placement.align}
-        offset={10}
-      >
-        <Popover title={d.title} description={d.description} />
-      </NodeToolbar>
       <div className="flex flex-wrap items-center justify-center gap-1.5">
         {d.brands.map((b) => (
           <span
@@ -315,18 +231,10 @@ function GroupNode({ data }: NodeProps) {
   );
 }
 
-function LabelNode({
-  data,
-  selected,
-  positionAbsoluteX,
-  positionAbsoluteY,
-  width,
-  height,
-}: NodeProps) {
+function LabelNode({ data, selected }: NodeProps) {
   const d = data as LabelData;
   const Icon = d.Icon;
   const interactive = !!d.description;
-  const placement = toolbarPlacement(positionAbsoluteX, positionAbsoluteY, width, height);
 
   // Interactive labels (Cloud Run, Cloud SQL, ...) render as platform buttons,
   // matching the rest of the nodes but with the light gray background. Plain
@@ -351,19 +259,6 @@ function LabelNode({
 
   return (
     <div className="group flex h-full w-full cursor-pointer items-center justify-center gap-2">
-      <NodeToolbar
-        isVisible={selected}
-        position={placement.position}
-        align={placement.align}
-        offset={10}
-      >
-        <Popover
-          title={d.title}
-          description={d.description as string}
-          rationaleTitle={d.rationaleTitle}
-          rationale={d.rationale}
-        />
-      </NodeToolbar>
       {d.logo ? (
         <img src={d.logo} alt="" className="h-7 w-auto shrink-0 object-contain" />
       ) : Icon ? (
@@ -995,6 +890,18 @@ function DiagramInner() {
     );
   }, [setNodes]);
 
+  // The popup is rendered as a single overlay centered in the canvas (instead of
+  // a per-node NodeToolbar anchored to the node), so it is always fully visible
+  // and never clipped by the canvas edges regardless of where the node sits.
+  const selectedData = nodes.find((n) => n.selected)?.data as
+    | {
+        title?: string;
+        description?: string;
+        rationaleTitle?: string;
+        rationale?: string;
+      }
+    | undefined;
+
   return (
     <div className="space-y-8">
       {/* Header: interaction hint + reset action (section title now lives in the navbar) */}
@@ -1022,7 +929,7 @@ function DiagramInner() {
           at 80% width and centers it, so we offset by 12.5% of that container on
           each side (= 10% of the viewport) to span the full window width without
           relying on 100vw (which would overflow past the reserved scrollbar gutter). */}
-      <div ref={canvasRef} className="h-[680px] -mx-[12.5%] overflow-hidden">
+      <div ref={canvasRef} className="relative h-[680px] -mx-[12.5%] overflow-hidden">
         <EdgeMarkerDefs />
         <ReactFlow
           className="arch-flow"
@@ -1054,6 +961,21 @@ function DiagramInner() {
         >
           <Background variant={BackgroundVariant.Dots} gap={22} size={1.5} color="var(--brand-subtle)" />
         </ReactFlow>
+        {/* Centered popup overlay. The wrapper ignores pointer events so a click
+            outside the card falls through to the pane and closes the popup, while
+            the card itself stays interactive. */}
+        {selectedData?.description && (
+          <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center p-6">
+            <div className="pointer-events-auto">
+              <Popover
+                title={selectedData.title ?? ""}
+                description={selectedData.description}
+                rationaleTitle={selectedData.rationaleTitle}
+                rationale={selectedData.rationale}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

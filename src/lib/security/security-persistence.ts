@@ -6,6 +6,7 @@ import {
   type CategoryKey,
   type NumberedSecurityFinding,
   type SecurityFinding,
+  formatFindingCode,
   isCategoryKey,
   isSeverity,
 } from "@/lib/security/security-catalog";
@@ -35,7 +36,6 @@ export type SecurityFindingWithState = {
 
 export type FindingInput = {
   id: string;
-  code: string;
   severity: Severity;
   category: CategoryKey;
   title: string;
@@ -165,7 +165,6 @@ function sanitizeCatalog(
   }
 
   if (
-    typeof value.code !== "string" ||
     !isSeverity(value.severity) ||
     !isCategoryKey(value.category) ||
     typeof value.title !== "string" ||
@@ -176,7 +175,6 @@ function sanitizeCatalog(
 
   return {
     id: findingId,
-    code: value.code,
     severity: value.severity,
     category: value.category,
     title: value.title,
@@ -195,6 +193,7 @@ export async function getAllSecurityFindings(): Promise<
   const rows: {
     order: number;
     catalog: SecurityFinding;
+    storedCode: string | null;
     record: SecurityFindingRecord | null;
   }[] = [];
 
@@ -208,36 +207,46 @@ export async function getAllSecurityFindings(): Promise<
 
     const order =
       typeof data.order === "number" ? data.order : Number.MAX_SAFE_INTEGER;
+    const storedCode =
+      typeof data.code === "string" && data.code.trim()
+        ? data.code.trim()
+        : null;
 
     rows.push({
       order,
       catalog,
+      storedCode,
       record: sanitizeFindingRecord(doc.id, data),
     });
   }
 
   rows.sort(
-    (a, b) => a.order - b.order || a.catalog.code.localeCompare(b.catalog.code),
+    (a, b) =>
+      a.order - b.order || a.catalog.title.localeCompare(b.catalog.title),
   );
 
-  return rows.map((row, index) => ({
-    finding: { ...row.catalog, number: index + 1 },
-    record: row.record,
-  }));
+  return rows.map((row, index) => {
+    const number = index + 1;
+    // Prefer the persisted identifier so it stays stable; fall back to a
+    // computed one for documents that predate the backfill.
+    const code =
+      row.storedCode ??
+      formatFindingCode({ category: row.catalog.category, number });
+
+    return {
+      finding: { ...row.catalog, number, code },
+      record: row.record,
+    };
+  });
 }
 
 function validateFindingInput(input: FindingInput) {
   const id = input.id.trim();
-  const code = input.code.trim();
   const title = input.title.trim();
   const detail = input.detail.trim();
 
   if (!id) {
     throw new SecurityPersistenceError("El identificador es obligatorio.", 400);
-  }
-
-  if (!code) {
-    throw new SecurityPersistenceError("El código es obligatorio.", 400);
   }
 
   if (!isSeverity(input.severity)) {
@@ -256,7 +265,7 @@ function validateFindingInput(input: FindingInput) {
     throw new SecurityPersistenceError("El detalle es obligatorio.", 400);
   }
 
-  return { id, code, title, detail };
+  return { id, title, detail };
 }
 
 async function getNextOrder() {
@@ -279,7 +288,7 @@ export async function upsertFinding(
   input: FindingInput,
   isNew: boolean,
 ): Promise<void> {
-  const { id, code, title, detail } = validateFindingInput(input);
+  const { id, title, detail } = validateFindingInput(input);
   const docRef = getSecurityFindingsCollection().doc(id);
   const existing = await docRef.get();
 
@@ -291,14 +300,16 @@ export async function upsertFinding(
       );
     }
 
+    const order = await getNextOrder();
+
     await docRef.set({
       findingId: id,
-      code,
       severity: input.severity,
       category: input.category,
       title,
       detail,
-      order: await getNextOrder(),
+      order,
+      code: formatFindingCode({ category: input.category, number: order }),
       currentStatus: getDefaultStatusForSeverity(input.severity),
       updatedAt: nowIso(),
       history: [],
@@ -314,13 +325,19 @@ export async function upsertFinding(
     );
   }
 
+  // Recompute the identifier on edit so a category change updates the letter
+  // while the number (its persisted order) stays put.
+  const existingOrder = existing.data()?.order;
+  const order =
+    typeof existingOrder === "number" ? existingOrder : await getNextOrder();
+
   await docRef.set(
     {
-      code,
       severity: input.severity,
       category: input.category,
       title,
       detail,
+      code: formatFindingCode({ category: input.category, number: order }),
     },
     { merge: true },
   );

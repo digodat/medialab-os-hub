@@ -131,19 +131,13 @@ export async function appendSecurityChangeAction(payload: {
 
 export async function upsertSecurityFindingAction(payload: {
   id?: string;
-  code: string;
   severity: Severity;
   category: CategoryKey;
   title: string;
   detail: string;
 }): Promise<UpsertFindingResult> {
-  const code = payload.code.trim();
   const title = payload.title.trim();
   const detail = payload.detail.trim();
-
-  if (!code) {
-    return { success: false, error: "El código es obligatorio." };
-  }
 
   if (!isSeverity(payload.severity)) {
     return { success: false, error: "La severidad no es válida." };
@@ -163,15 +157,15 @@ export async function upsertSecurityFindingAction(payload: {
 
   const existingId = payload.id?.trim();
   const isNew = !existingId;
-  // For new findings derive a readable id from the code/title, falling back to
-  // a random suffix to avoid collisions.
+  // For new findings derive a readable id from the title, falling back to a
+  // random suffix to avoid collisions.
   const id =
     existingId ||
-    `${slugify(`${code}-${title}`) || "finding"}-${crypto.randomUUID().slice(0, 8)}`;
+    `${slugify(title) || "finding"}-${crypto.randomUUID().slice(0, 8)}`;
 
   try {
     await upsertFinding(
-      { id, code, severity: payload.severity, category: payload.category, title, detail },
+      { id, severity: payload.severity, category: payload.category, title, detail },
       isNew,
     );
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import { ChevronDownIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 import { SuccessCheck } from "@/components/ui/success-check";
 import {
@@ -12,7 +12,6 @@ import {
 import type { Severity } from "@/lib/security/security-status";
 
 export type FindingFormValues = {
-  code: string;
   severity: Severity;
   category: CategoryKey;
   title: string;
@@ -22,6 +21,7 @@ export type FindingFormValues = {
 type FindingModalProps = {
   open: boolean;
   mode: "create" | "edit";
+  findingCode?: string;
   initialValues?: FindingFormValues;
   isSubmitting: boolean;
   showSuccess: boolean;
@@ -31,7 +31,6 @@ type FindingModalProps = {
 };
 
 const EMPTY_VALUES: FindingFormValues = {
-  code: "",
   severity: "MEDIO",
   category: "platform",
   title: "",
@@ -52,6 +51,7 @@ function getFocusableElements(container: HTMLElement) {
 export function FindingModal({
   open,
   mode,
+  findingCode,
   initialValues,
   isSubmitting,
   showSuccess,
@@ -61,7 +61,7 @@ export function FindingModal({
 }: FindingModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
-  const firstFieldRef = useRef<HTMLInputElement>(null);
+  const firstFieldRef = useRef<HTMLSelectElement>(null);
   const successRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const [values, setValues] = useState<FindingFormValues>(EMPTY_VALUES);
@@ -155,6 +155,7 @@ export function FindingModal({
 
   const fieldClass =
     "w-full rounded-xl border border-foreground/10 bg-white px-3 py-2.5 text-sm text-foreground placeholder:text-foreground/35 outline-none transition-colors focus:border-brand disabled:opacity-60";
+  const selectClass = `${fieldClass} appearance-none pr-9`;
   const labelClass =
     "mb-2 block text-xs font-semibold uppercase tracking-wide text-foreground/45";
 
@@ -193,12 +194,19 @@ export function FindingModal({
         ) : (
           <>
             <div className="mb-5 flex items-start justify-between gap-4">
-              <h2
-                id={titleId}
-                className="text-lg font-semibold tracking-tight text-foreground"
-              >
-                {mode === "create" ? "Nuevo hallazgo" : "Editar hallazgo"}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2
+                  id={titleId}
+                  className="text-lg font-semibold tracking-tight text-foreground"
+                >
+                  {mode === "create" ? "Nuevo hallazgo" : "Editar hallazgo"}
+                </h2>
+                {mode === "edit" && findingCode ? (
+                  <span className="rounded-full bg-foreground/5 px-2 py-0.5 font-mono text-xs font-semibold text-foreground/55">
+                    {findingCode}
+                  </span>
+                ) : null}
+              </div>
               <button
                 type="button"
                 aria-label="Cerrar"
@@ -211,24 +219,11 @@ export function FindingModal({
             </div>
 
             <div className="space-y-4">
-              <div className="flex gap-3">
-                <label className="block w-28 shrink-0">
-                  <span className={labelClass}>Código</span>
-                  <input
-                    ref={firstFieldRef}
-                    type="text"
-                    value={values.code}
-                    disabled={isSubmitting}
-                    placeholder="C1"
-                    onChange={(event) =>
-                      setValues((prev) => ({ ...prev, code: event.target.value }))
-                    }
-                    className={fieldClass}
-                  />
-                </label>
-                <label className="block flex-1">
-                  <span className={labelClass}>Severidad</span>
+              <label className="block">
+                <span className={labelClass}>Severidad</span>
+                <div className="relative">
                   <select
+                    ref={firstFieldRef}
                     value={values.severity}
                     disabled={isSubmitting}
                     onChange={(event) =>
@@ -237,7 +232,7 @@ export function FindingModal({
                         severity: event.target.value as Severity,
                       }))
                     }
-                    className={fieldClass}
+                    className={selectClass}
                   >
                     {SEVERITY_VALUES.map((severity) => (
                       <option key={severity} value={severity}>
@@ -245,28 +240,32 @@ export function FindingModal({
                       </option>
                     ))}
                   </select>
-                </label>
-              </div>
+                  <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/40" />
+                </div>
+              </label>
 
               <label className="block">
                 <span className={labelClass}>Categoría</span>
-                <select
-                  value={values.category}
-                  disabled={isSubmitting}
-                  onChange={(event) =>
-                    setValues((prev) => ({
-                      ...prev,
-                      category: event.target.value as CategoryKey,
-                    }))
-                  }
-                  className={fieldClass}
-                >
-                  {SECURITY_CATEGORIES.map((category) => (
-                    <option key={category.key} value={category.key}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={values.category}
+                    disabled={isSubmitting}
+                    onChange={(event) =>
+                      setValues((prev) => ({
+                        ...prev,
+                        category: event.target.value as CategoryKey,
+                      }))
+                    }
+                    className={selectClass}
+                  >
+                    {SECURITY_CATEGORIES.map((category) => (
+                      <option key={category.key} value={category.key}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/40" />
+                </div>
               </label>
 
               <label className="block">
