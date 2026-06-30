@@ -15,6 +15,7 @@ import {
   ArrowRightIcon,
 } from "@heroicons/react/24/outline";
 import { CoreAnimation } from "@/components/landing/core-animation";
+import { OssTerm } from "@/components/landing/oss-term";
 import { ScrollHint } from "@/components/landing/scroll-hint";
 
 const SECTIONS = [
@@ -36,7 +37,12 @@ const STEPS = [
   {
     Icon: ClipboardDocumentCheckIcon,
     title: "Planificación",
-    body: "Las estrategias de medios se definen y aprueban en OSS, el sistema de planificación de Falabella.",
+    body: (
+      <>
+        Las estrategias de medios se definen y aprueban en <OssTerm />, el
+        sistema de planificación de Falabella.
+      </>
+    ),
   },
   {
     Icon: CircleStackIcon,
@@ -181,7 +187,7 @@ export default function HomePage() {
           <p className="text-base leading-relaxed text-foreground/75 first-letter:float-left first-letter:mr-2 first-letter:font-heading first-letter:text-6xl first-letter:leading-[0.8] first-letter:text-brand">
             MediaLab OS es la herramienta interna que automatiza el despliegue de
             campañas publicitarias de Falabella en Google Ads, Meta y TikTok.
-            Toma las estrategias ya planificadas en OSS y le permite al equipo de
+            Toma las estrategias ya planificadas en <OssTerm /> y le permite al equipo de
             medios lanzarlas en las tres plataformas —y en los tres mercados de
             la región— desde un único flujo guiado, sin saltar entre cuentas ni
             configurar cada campaña a mano.
@@ -214,18 +220,12 @@ export default function HomePage() {
 
         {/* How it works */}
         <div className="mt-20">
-          <p className="text-xs uppercase tracking-[0.25em] text-foreground/40">
-            Cómo funciona
-          </p>
-          <h3 className="mt-2 font-heading text-2xl font-semibold tracking-tight text-foreground">
+          <h3 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
             De la estrategia a la campaña en vivo
           </h3>
           <ol className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((step, index) => (
-              <li
-                key={step.title}
-                className="relative rounded-2xl border border-foreground/10 bg-white/40 p-5 shadow-sm backdrop-blur-sm"
-              >
+              <li key={step.title} className="relative p-5">
                 <div className="flex items-center justify-between">
                   <step.Icon className="h-6 w-6 text-brand" />
                   <span className="font-heading text-sm font-semibold text-foreground/25">
@@ -245,18 +245,12 @@ export default function HomePage() {
 
         {/* Business value */}
         <div className="mt-20">
-          <p className="text-xs uppercase tracking-[0.25em] text-foreground/40">
-            Qué aporta al negocio
-          </p>
-          <h3 className="mt-2 font-heading text-2xl font-semibold tracking-tight text-foreground">
+          <h3 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
             Más velocidad, menos riesgo
           </h3>
           <div className="mt-8 grid gap-5 sm:grid-cols-2">
             {CAPABILITIES.map((capability) => (
-              <div
-                key={capability.title}
-                className="flex gap-4 rounded-2xl border border-foreground/10 bg-white/40 p-5 shadow-sm backdrop-blur-sm"
-              >
+              <div key={capability.title} className="flex gap-4 p-5">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-subtle">
                   <capability.Icon className="h-5 w-5 text-brand" />
                 </span>
@@ -329,21 +323,6 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
-
-        {/* Contextual aside about OSS — secondary, but readable. */}
-        <aside className="mt-20 rounded-2xl border border-foreground/10 bg-white/40 p-6 shadow-sm backdrop-blur-sm">
-          <h4 className="text-sm font-semibold tracking-tight text-foreground/75">
-            ¿Qué es OSS y cómo nos integramos?
-          </h4>
-          <p className="mt-3 text-sm leading-relaxed text-foreground/60">
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do
-            eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim
-            ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut
-            aliquip ex ea commodo consequat. Duis aute irure dolor in
-            reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
-            pariatur.
-          </p>
-        </aside>
 
       </section>
       </main>

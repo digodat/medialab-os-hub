@@ -35,15 +35,23 @@ export function NavBar() {
         style={{ WebkitBackdropFilter: "blur(12px)" }}
       />
       <div className="relative max-w-[1440px] mx-auto px-8 md:px-16 h-16 flex items-center justify-between">
-        <Link
-          href="/"
-          className="font-heading text-xl tracking-tighter text-foreground leading-none"
-        >
-          <span className="opacity-85">
-            MEDIA<span className="italic">Lab</span> OS
+        {brandSuffix ? (
+          <span className="font-heading text-xl tracking-tighter text-foreground leading-none">
+            <span className="opacity-85">
+              MEDIA<span className="italic">Lab</span> OS
+            </span>
+            <span className="opacity-[0.73]"> - {brandSuffix}</span>
           </span>
-          {brandSuffix ? <span className="opacity-[0.73]"> - {brandSuffix}</span> : null}
-        </Link>
+        ) : (
+          <Link
+            href="/"
+            className="font-heading text-xl tracking-tighter text-foreground leading-none"
+          >
+            <span className="opacity-85">
+              MEDIA<span className="italic">Lab</span> OS
+            </span>
+          </Link>
+        )}
         <nav className="hidden lg:flex items-center gap-7">
           {NAV_LINKS.map(({ href, label }) => {
             const isActive = matchesHref(pathname, href);

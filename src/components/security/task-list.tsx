@@ -245,7 +245,7 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
   const [severityFilter, setSeverityFilter] = useState<Severity | null>(null);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | null>(null);
   const [openCategories, setOpenCategories] = useState<Set<string>>(
-    () => new Set(SECURITY_CATEGORIES.map((category) => category.key)),
+    () => new Set(),
   );
   const [openRows, setOpenRows] = useState<Set<number>>(new Set());
   const [pendingChange, setPendingChange] = useState<PendingChange | null>(null);
