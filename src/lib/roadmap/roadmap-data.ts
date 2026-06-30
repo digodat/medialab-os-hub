@@ -16,18 +16,34 @@
 export type RoadmapStatus = "planned" | "in-progress" | "done";
 
 export type RoadmapEpic = {
+  // Unique, stable, kebab-case id. It is the handle used by `dependsOn` and as
+  // a React key, so it must be unique across the whole ROADMAP_EPICS array and
+  // should not change once other epics depend on it.
   id: string;
+  // Bar label shown on the chart and as the dialog title.
   title: string;
+  // Swimlane this epic belongs to. MUST match a `RoadmapGroup.id` from
+  // ROADMAP_GROUPS (e.g. "infra" | "datos" | "app"). An epic whose group does
+  // not exist there is silently dropped (it is filtered out by group in the
+  // layout), so double-check the id.
   group: string;
-  // Inclusive week indices relative to the timeline start.
+  // Inclusive week indices relative to the timeline start (TIMELINE_START).
+  // See the file header for the week -> month mapping. A single-week epic uses
+  // startWeek === endWeek. The bar spans (endWeek - startWeek + 1) weeks.
+  // Both must stay within [0, totalWeeks - 1]; to place a bar later than the
+  // current horizon, extend TIMELINE_MONTHS rather than overflowing the index.
   startWeek: number;
   endWeek: number;
   status: RoadmapStatus;
-  // Subtasks shown as a bullet list in the task detail popup.
+  // Subtasks shown as a bullet list in the task detail popup. Plain strings,
+  // one bullet each. UI copy in Spanish with correct accents.
   detail: string[];
-  // IDs of epics that must finish before this one (drawn as arrows).
+  // IDs of epics that must finish before this one. Each id is rendered as a
+  // dashed dependency arrow from the source's end to this epic's start. See the
+  // "DEPENDENCIES" section in the ROADMAP_EPICS guide below for the rules.
   dependsOn?: string[];
-  // Optional owner of the epic, rendered as a badge (e.g. "Falabella").
+  // Optional owner of the epic, rendered as a circular initial badge on the bar
+  // and as a "Owner:" pill in the dialog (e.g. "Falabella").
   owner?: string;
 };
 
@@ -88,6 +104,99 @@ export const ROADMAP_GROUPS: RoadmapGroup[] = [
   { id: "app", name: "Aplicación" },
 ];
 
+// =============================================================================
+// HOW TO EDIT THE ROADMAP (read this before changing anything below)
+// =============================================================================
+//
+// This array is the SINGLE SOURCE OF TRUTH for the Gantt chart. Everything else
+// is derived from it automatically: bars, swimlanes, the month/week axis,
+// dependency arrows, hover highlighting and the detail popup. To update the
+// roadmap you almost always only touch THIS array (and occasionally the
+// timeline / group constants above). You do NOT need to edit any .tsx file to
+// add, move or remove a task.
+//
+// -----------------------------------------------------------------------------
+// 1. ADD A NEW TASK (epic)
+// -----------------------------------------------------------------------------
+// Append (or insert near its siblings) a new RoadmapEpic object. Minimum shape:
+//
+//   {
+//     id: "mi-epica",            // unique, kebab-case, never reused
+//     title: "Título visible",   // Spanish, shown on the bar
+//     group: "app",              // must be a RoadmapGroup.id (see ROADMAP_GROUPS)
+//     startWeek: 8,              // 0-based week index from TIMELINE_START
+//     endWeek: 9,                // inclusive; === startWeek for a 1-week bar
+//     status: "planned",         // "planned" | "in-progress" | "done"
+//     detail: ["Subtarea 1", "Subtarea 2"], // bullets in the popup
+//     // dependsOn: ["otra-epica"], // optional, see DEPENDENCIES below
+//     // owner: "Falabella",        // optional badge
+//   }
+//
+// Array order only matters as a tie-breaker; vertical placement inside a group
+// is computed by packLanes() from startWeek/endWeek and dependencies, so you
+// don't manually choose a row. Grouping the objects by topic (as done below,
+// with a leading comment per block) keeps the file readable.
+//
+// -----------------------------------------------------------------------------
+// 2. WEEKS AND DATES (where a bar lands horizontally)
+// -----------------------------------------------------------------------------
+// Weeks are 0-based indices relative to TIMELINE_START, in fixed blocks of
+// WEEKS_PER_MONTH (see the mapping table in the file header). Quick math:
+//   weekIndex = (monthsFromStart * WEEKS_PER_MONTH) + (weekInMonth - 1)
+// e.g. "S2 de agosto" with start = Jun '26 -> month offset 2, week 2 ->
+//   (2 * 4) + (2 - 1) = 9. Use formatWeekLabel(index) mentally to verify.
+// If a task falls AFTER the current horizon, do NOT push the index past the end:
+// bump TIMELINE_MONTHS (and the header table) so the axis grows to include it.
+// To shift the whole timeline, change TIMELINE_START.
+//
+// -----------------------------------------------------------------------------
+// 3. SWIMLANES / GROUPS
+// -----------------------------------------------------------------------------
+// `group` must equal an existing RoadmapGroup.id in ROADMAP_GROUPS. The order of
+// ROADMAP_GROUPS is the top-to-bottom order of the swimlanes. To add a new lane,
+// add an entry to ROADMAP_GROUPS first, then point epics at its id. The "N
+// épicas" counter in the sidebar is derived automatically.
+//
+// -----------------------------------------------------------------------------
+// 4. DEPENDENCIES (the dashed arrows)
+// -----------------------------------------------------------------------------
+// `dependsOn` lists the ids of epics that must finish before this one starts.
+// Each id draws one dashed arrow from the SOURCE's end (endWeek + 1) to THIS
+// epic's start (startWeek). Rules and gotchas:
+//
+//   * Every id in dependsOn MUST exist in this array. Unknown ids are skipped
+//     silently (no arrow, no error), which usually means a typo.
+//   * Arrows are meant to flow forward in time. For a clean left-to-right arrow,
+//     keep target.startWeek >= source.endWeek + 1. If the target starts before
+//     the source ends, the curve will point backwards and look wrong.
+//   * SAME-GROUP dependencies also affect vertical layout: packLanes() forces a
+//     dependent epic onto a lane strictly BELOW all of its in-group
+//     dependencies, so arrows within a swimlane always flow downward. Adding an
+//     in-group dependency can therefore add a row to that group.
+//   * CROSS-GROUP dependencies (e.g. an "app" epic depending on a "datos" epic)
+//     are allowed and common; they only draw an arrow across lanes and do not
+//     constrain lane packing.
+//   * Avoid dependency cycles (A depends on B and B depends on A). Nothing
+//     enforces acyclicity; a cycle produces nonsensical arrows/lanes.
+//   * Removing or renaming an epic id means you must update every dependsOn that
+//     referenced it. Search the file for the old id before deleting.
+//
+// The arrow geometry, hover highlighting and the "Depende de" row in the popup
+// are all generated from dependsOn in roadmap-gantt.tsx / roadmap-bars.tsx — no
+// manual wiring needed.
+//
+// -----------------------------------------------------------------------------
+// 5. STATUS AND OWNER
+// -----------------------------------------------------------------------------
+// status drives the bar colors and the legend (see STATUS_STYLES):
+//   "done"        -> green   ("Completado")
+//   "in-progress" -> brand   ("En curso")
+//   "planned"     -> neutral ("Planificado")
+// owner (optional) shows a one-letter circular badge on the bar and an "Owner:"
+// pill in the dialog. Use it for work driven by an external team (e.g.
+// "Falabella").
+// =============================================================================
+//
 // Cloud SQL (PostgreSQL) es el destino confirmado del almacenamiento de datos.
 // Hoy todo vive en BigQuery (datasets `falabella_medialab_os` y
 // `platform_performance`); estas épicas son la migración de BigQuery a Cloud SQL

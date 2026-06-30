@@ -98,6 +98,9 @@
        including when section content is centered. */
     overflow-y: scroll;
     scrollbar-gutter: stable;
+    /* Disable the elastic overscroll/bounce so no blank gap (e.g. a white line
+       at the top) is revealed when scrolling past the content edges. */
+    overscroll-behavior-y: none;
   }
   body {
     @apply text-foreground;

@@ -18,6 +18,7 @@ import {
   Background,
   BackgroundVariant,
   BaseEdge,
+  getNodesBounds,
   getSmoothStepPath,
   Handle,
   MarkerType,
@@ -977,6 +978,43 @@ const EDGES: Edge[] = [
 
 const FIT_VIEW_OPTIONS = { padding: 0.12 };
 
+// Tight bounds around the actual diagram content. Large padding in translateExtent
+// becomes visible empty space when zoomed in (a solid band at the edges).
+// Horizontal padding is wider than vertical so there's extra room to pan sideways
+// without exposing an empty band above/below the content.
+const CONTENT_BOUNDS = getNodesBounds(NODES);
+const EXTENT_PADDING_X = 220;
+const EXTENT_PADDING_Y = 8;
+const TRANSLATE_EXTENT: [[number, number], [number, number]] = [
+  [CONTENT_BOUNDS.x - EXTENT_PADDING_X, CONTENT_BOUNDS.y - EXTENT_PADDING_Y],
+  [
+    CONTENT_BOUNDS.x + CONTENT_BOUNDS.width + EXTENT_PADDING_X,
+    CONTENT_BOUNDS.y + CONTENT_BOUNDS.height + EXTENT_PADDING_Y,
+  ],
+];
+
+// Clamp viewport translation so content edges align with the canvas at any zoom.
+// Mirrors React Flow / d3-zoom constrain math used by translateExtent.
+function clampViewportTranslation(
+  vp: { x: number; y: number; zoom: number },
+  width: number,
+  height: number,
+): { x: number; y: number } {
+  const k = vp.zoom;
+  const [minFlowX, minFlowY] = TRANSLATE_EXTENT[0];
+  const [maxFlowX, maxFlowY] = TRANSLATE_EXTENT[1];
+
+  const maxX = -minFlowX * k;
+  const minX = width - maxFlowX * k;
+  const maxY = -minFlowY * k;
+  const minY = height - maxFlowY * k;
+
+  return {
+    x: minX > maxX ? (minX + maxX) / 2 : Math.min(maxX, Math.max(minX, vp.x)),
+    y: minY > maxY ? (minY + maxY) / 2 : Math.min(maxY, Math.max(minY, vp.y)),
+  };
+}
+
 function DiagramInner() {
   const [nodes, , onNodesChange] = useNodesState(NODES);
   const [edges] = useEdgesState(EDGES);
@@ -1005,21 +1043,56 @@ function DiagramInner() {
   );
   const handleNodeMouseLeave = useCallback(() => setHoveredId(null), []);
 
-  // Horizontal wheel/trackpad (or Shift + wheel) pans the diagram sideways,
-  // while vertical wheel is left to the page. A native non-passive listener is
-  // required because React's onWheel is passive and can't preventDefault.
+  // Re-clamp after drag-pan or zoom so the viewport never rests on empty padding.
+  const handleMoveEnd = useCallback(() => {
+    if (hasSelection) return;
+    const el = canvasRef.current;
+    if (!el) return;
+    const vp = getViewport();
+    const { width, height } = el.getBoundingClientRect();
+    const next = clampViewportTranslation(vp, width, height);
+    if (next.x !== vp.x || next.y !== vp.y) {
+      setViewport({ ...vp, ...next });
+    }
+  }, [hasSelection, getViewport, setViewport]);
+
+  // Wheel/trackpad handling. Horizontal gestures (or Shift + wheel) pan sideways.
+  // Vertical gestures pan the diagram down/up while it overflows the canvas (i.e.
+  // when zoomed in and there's clipped content), and only hand the scroll back to
+  // the page once the top/bottom edge is reached — so the lower nodes are always
+  // reachable. A native non-passive listener is required because React's onWheel
+  // is passive and can't preventDefault.
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       if (hasSelection) return;
+      const vp = getViewport();
+      const { width, height } = el.getBoundingClientRect();
       const horizontal = e.shiftKey ? e.deltaY : e.deltaX;
       const vertical = e.shiftKey ? 0 : e.deltaY;
-      // Only act when the gesture is mostly horizontal; otherwise let the page scroll.
-      if (Math.abs(horizontal) <= Math.abs(vertical)) return;
+
+      if (Math.abs(horizontal) > Math.abs(vertical)) {
+        e.preventDefault();
+        const next = clampViewportTranslation(
+          { ...vp, x: vp.x - horizontal },
+          width,
+          height,
+        );
+        setViewport({ ...vp, ...next });
+        return;
+      }
+
+      // Vertical gesture: pan the diagram only while it overflows vertically and
+      // hasn't reached the edge yet; otherwise let the page scroll as usual.
+      const k = vp.zoom;
+      const minY = height - TRANSLATE_EXTENT[1][1] * k;
+      const maxY = -TRANSLATE_EXTENT[0][1] * k;
+      if (minY >= maxY) return; // content fits vertically -> page scrolls
+      const nextY = Math.min(maxY, Math.max(minY, vp.y - vertical));
+      if (nextY === vp.y) return; // at top/bottom edge -> page scrolls
       e.preventDefault();
-      const vp = getViewport();
-      setViewport({ ...vp, x: vp.x - horizontal });
+      setViewport({ ...vp, y: nextY });
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
@@ -1105,7 +1178,10 @@ function DiagramInner() {
           at 80% width and centers it, so we offset by 12.5% of that container on
           each side (= 10% of the viewport) to span the full window width without
           relying on 100vw (which would overflow past the reserved scrollbar gutter). */}
-      <div ref={canvasRef} className="relative h-[680px] -mx-[12.5%] overflow-hidden">
+      <div
+        ref={canvasRef}
+        className="relative h-[680px] -mx-[12.5%] overflow-hidden bg-[var(--app-background)]"
+      >
         <EdgeMarkerDefs />
         <HoverContext.Provider value={hoveredId}>
           <ReactFlow
@@ -1117,10 +1193,12 @@ function DiagramInner() {
             onNodeMouseEnter={handleNodeMouseEnter}
             onNodeMouseLeave={handleNodeMouseLeave}
             onPaneClick={handlePaneClick}
+            onMoveEnd={handleMoveEnd}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             fitView
             fitViewOptions={FIT_VIEW_OPTIONS}
+            translateExtent={TRANSLATE_EXTENT}
             minZoom={0.3}
             maxZoom={2}
             nodesDraggable={false}
