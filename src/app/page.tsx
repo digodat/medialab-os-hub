@@ -15,6 +15,7 @@ import {
   ArrowRightIcon,
 } from "@heroicons/react/24/outline";
 import { CoreAnimation } from "@/components/landing/core-animation";
+import { CoverageDiagram } from "@/components/landing/coverage-diagram";
 import { OssTerm } from "@/components/landing/oss-term";
 import { ScrollHint } from "@/components/landing/scroll-hint";
 
@@ -25,13 +26,7 @@ const SECTIONS = [
   { href: "/knowledge",    Icon: BookOpenIcon,         label: "Conocimiento" },
 ];
 
-// Below-the-fold overview content. Sourced from the hub sections (architecture
-// diagram, roadmap, security catalog) and the falabella-medialab-os codebase.
-const METRICS = [
-  { value: "3", label: "Mercados — Chile, Colombia y Perú" },
-  { value: "3", label: "Plataformas — Google Ads, Meta y TikTok" },
-  { value: "7", label: "Tipos de campaña soportados" },
-];
+const MEDIA_PLATFORMS = "Google Ads, Meta, TikTok y DV 360";
 
 const STEPS = [
   {
@@ -52,7 +47,7 @@ const STEPS = [
   {
     Icon: PaperAirplaneIcon,
     title: "Despliegue",
-    body: "El operador completa un formulario y la app crea las campañas en cada plataforma, paso a paso y de forma auditable.",
+    body: `El operador completa un formulario y la app crea las campañas en ${MEDIA_PLATFORMS}, paso a paso y de forma auditable.`,
   },
   {
     Icon: BellAlertIcon,
@@ -65,7 +60,7 @@ const CAPABILITIES = [
   {
     Icon: BoltIcon,
     title: "Velocidad operativa",
-    body: "Lo que antes implicaba configurar campaña por campaña en cada plataforma ahora se dispara desde un único flujo guiado.",
+    body: `Lo que antes implicaba configurar campaña por campaña en ${MEDIA_PLATFORMS} ahora se dispara desde un único flujo guiado.`,
   },
   {
     Icon: GlobeAltIcon,
@@ -95,7 +90,7 @@ const ROADMAP_POINTS = [
   "Migración de la base de datos a Cloud SQL (PostgreSQL).",
   "Acceso corporativo con SSO y roles por usuario.",
   "Módulo de logs de actividad para auditoría completa.",
-  "Alertas e integraciones nativas (TikTok y Meta) consolidadas.",
+  "Alertas e integraciones nativas (Meta, TikTok y DV 360) consolidadas.",
   "Auditoría de seguridad y ethical hacking a cargo de Falabella.",
 ];
 
@@ -178,44 +173,33 @@ export default function HomePage() {
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-foreground/65">
             MediaLab OS centraliza y automatiza el despliegue de campañas
-            publicitarias de Falabella en Google Ads, Meta y TikTok.
+            publicitarias de Falabella en {MEDIA_PLATFORMS}.
           </p>
         </header>
 
-        {/* Lead — the pitch */}
-        <div className="mx-auto max-w-3xl space-y-5">
-          <p className="text-base leading-relaxed text-foreground/75 first-letter:float-left first-letter:mr-2 first-letter:font-heading first-letter:text-6xl first-letter:leading-[0.8] first-letter:text-brand">
-            MediaLab OS es la herramienta interna que automatiza el despliegue de
-            campañas publicitarias de Falabella en Google Ads, Meta y TikTok.
-            Toma las estrategias ya planificadas en <OssTerm /> y le permite al equipo de
-            medios lanzarlas en las tres plataformas —y en los tres mercados de
-            la región— desde un único flujo guiado, sin saltar entre cuentas ni
-            configurar cada campaña a mano.
-          </p>
-          <p className="text-base leading-relaxed text-foreground/65">
-            El objetivo es simple: convertir un proceso manual, repetitivo y
-            propenso a errores en una operación rápida, consistente y trazable.
-            Cada envío queda registrado y, por diseño, las campañas siempre se
-            crean en pausa: ninguna inversión se activa sin una validación humana
-            de por medio.
-          </p>
-        </div>
+        {/* Lead + coverage diagram side by side */}
+        <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_35vw] lg:items-center lg:gap-12 xl:gap-16">
+          <div className="min-w-0 space-y-5">
+            <p className="text-base leading-relaxed text-foreground/75 first-letter:float-left first-letter:mr-2 first-letter:font-heading first-letter:text-6xl first-letter:leading-[0.8] first-letter:text-brand">
+              MediaLab OS es la herramienta interna que automatiza el despliegue de
+              campañas publicitarias de Falabella en {MEDIA_PLATFORMS}.
+              Toma las estrategias ya planificadas en <OssTerm /> y le permite al equipo de
+              medios lanzarlas en las cuatro plataformas —y en los tres mercados de
+              la región— desde un único flujo guiado, sin saltar entre cuentas ni
+              configurar cada campaña a mano.
+            </p>
+            <p className="text-base leading-relaxed text-foreground/65">
+              El objetivo es simple: convertir un proceso manual, repetitivo y
+              propenso a errores en una operación rápida, consistente y trazable.
+              Cada envío queda registrado y, por diseño, las campañas siempre se
+              crean en pausa: ninguna inversión se activa sin una validación humana
+              de por medio.
+            </p>
+          </div>
 
-        {/* Metrics strip */}
-        <div className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {METRICS.map((metric) => (
-            <div
-              key={metric.label}
-              className="metric-glass-card flex flex-col rounded-2xl px-5 py-6"
-            >
-              <span className="font-heading text-4xl font-semibold tracking-tight text-brand">
-                {metric.value}
-              </span>
-              <span className="mt-2 text-sm leading-snug text-foreground/60">
-                {metric.label}
-              </span>
-            </div>
-          ))}
+          <div className="mx-auto w-full max-w-[35vw] lg:mx-0 lg:justify-self-end">
+            <CoverageDiagram />
+          </div>
         </div>
 
         {/* How it works */}
@@ -265,6 +249,17 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+
+          <figure className="mt-12 overflow-hidden rounded-xl border-2 border-foreground/20 bg-white shadow-sm shadow-foreground/5">
+            <Image
+              src="/landing/oss-campaigns-screen.png"
+              alt="Captura de pantalla de MediaLab OS con la vista de campañas OSS"
+              width={3006}
+              height={1616}
+              className="h-auto w-full"
+              sizes="(max-width: 1440px) 100vw, 1440px"
+            />
+          </figure>
         </div>
 
         {/* Security + Roadmap */}

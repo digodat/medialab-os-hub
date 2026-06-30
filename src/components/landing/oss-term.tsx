@@ -83,8 +83,8 @@ export function OssTerm() {
               </p>
               <p>
                 MediaLab OS toma esas estrategias ya aprobadas en OSS y se
-                encarga de desplegarlas en Google Ads, Meta y TikTok, en los
-                tres mercados, sin reconfigurar cada campaña a mano.
+                encarga de desplegarlas en Google Ads, Meta, TikTok y DV 360, en
+                los tres mercados, sin reconfigurar cada campaña a mano.
               </p>
             </div>
           </div>
