@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function ArchitecturePage() {
   return (
-    <div className="pt-6 pb-16">
+    <div className="pt-3 pb-16">
       <ArchitectureDiagram />
     </div>
   );

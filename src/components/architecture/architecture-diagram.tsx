@@ -26,6 +26,7 @@ import {
   useEdgesState,
   useNodesState,
   useReactFlow,
+  useStoreApi,
   type Edge,
   type EdgeProps,
   type Node,
@@ -370,7 +371,13 @@ const nodeTypes = {
 };
 
 const groupStyle = (w: number, h: number) => ({ width: w, height: h, zIndex: 0 });
-const boxStyle = (w: number, h: number) => ({ width: w, height: h, zIndex: 1 });
+// Higher nodes (smaller y) get a higher z-index so lower nodes never paint over them when zoom overlaps.
+const nodeZIndex = (y: number) => 1000 - Math.round(y);
+const boxStyle = (w: number, h: number, y: number) => ({
+  width: w,
+  height: h,
+  zIndex: nodeZIndex(y),
+});
 
 // Horizontal lane layout (left -> right):
 //   A: UI MediaLab OS  |  B: Cloud SQL  |  C: Cloud Functions  |  D: sources/sinks
@@ -423,7 +430,7 @@ const NODES: Node[] = [
         "Lo elegimos sobre una VM o GKE porque escala a cero y cobra solo por request, sin servidores ni clústeres que mantener. Para una herramienta interna de tráfico intermitente evita el costo fijo de Compute Engine y la complejidad operativa de Kubernetes.",
     },
     draggable: false,
-    style: boxStyle(150, 32),
+    style: boxStyle(150, 32, 124),
   },
   {
     id: "l_cloudsql",
@@ -441,7 +448,7 @@ const NODES: Node[] = [
         "En vez de auto-gestionar PostgreSQL en una VM, nos da backups, alta disponibilidad y parches automáticos. Frente a Firestore mantenemos un modelo relacional, que encaja mejor con los datos estructurados y los joins que necesita la plataforma.",
     },
     draggable: false,
-    style: boxStyle(170, 32),
+    style: boxStyle(170, 32, 124),
   },
 
   // Lane A — UI MediaLab OS (order aligned with the tables they touch)
@@ -458,7 +465,7 @@ const NODES: Node[] = [
       rationale:
         "Delegamos la autenticación en un servicio gestionado (IAP o SSO corporativo) en lugar de implementar login propio: no manejamos contraseñas ni sesiones, se integra con las cuentas de la organización y la autorización se aplica antes de que el tráfico llegue a la app.",
     },
-    style: boxStyle(228, 40),
+    style: boxStyle(228, 40, 166),
   },
   {
     id: "logs_actividades",
@@ -470,7 +477,7 @@ const NODES: Node[] = [
       description:
         "Persiste cada acción del usuario en la Tabla Actividades para auditoría.",
     },
-    style: boxStyle(228, 40),
+    style: boxStyle(228, 40, 216),
   },
   {
     id: "logica_alertas",
@@ -482,7 +489,7 @@ const NODES: Node[] = [
       description:
         "Evalúa condiciones sobre los datos y dispara notificaciones a Teams y Gmail.",
     },
-    style: boxStyle(228, 40),
+    style: boxStyle(228, 40, 266),
   },
   {
     id: "envio_campanas",
@@ -494,7 +501,7 @@ const NODES: Node[] = [
       description:
         "Publica campañas hacia Google Ads, Meta y TikTok usando la Service Account. El sistema opera tres mercados independientes (Chile, Colombia y Perú): cada país tiene sus propias credenciales de plataforma (MCC, cuentas de ads y Merchant Center), y el envío resuelve el mercado correcto según la campaña. Cada envío genera un job auditable con seguimiento paso a paso del progreso.",
     },
-    style: boxStyle(228, 44),
+    style: boxStyle(228, 44, 316),
   },
   {
     id: "backend",
@@ -506,7 +513,7 @@ const NODES: Node[] = [
       description:
         "Capa de backend de la aplicación. La lógica de negocio vive en las API routes de Next.js (patrón BFF, alrededor de 47 endpoints) que orquestan OSS, las plataformas de publicidad, Cloud Storage y la base de datos; no hay un servicio backend separado. Se autentica ante los servicios de GCP mediante la Service Account.",
     },
-    style: boxStyle(228, 40),
+    style: boxStyle(228, 40, 370),
   },
 
   // Lane B — Cloud SQL tables
@@ -520,7 +527,7 @@ const NODES: Node[] = [
       description:
         "Almacena las cuentas del equipo, roles y permisos. La consulta el SSO / IAP para autorizar el acceso.",
     },
-    style: boxStyle(200, 38),
+    style: boxStyle(200, 38, 160),
   },
   {
     id: "tbl_actividades",
@@ -532,7 +539,7 @@ const NODES: Node[] = [
       description:
         "Registro de las acciones realizadas en la plataforma. Alimentada por los Logs de Actividades de la UI.",
     },
-    style: boxStyle(200, 38),
+    style: boxStyle(200, 38, 206),
   },
   {
     id: "tbl_alertas",
@@ -544,7 +551,7 @@ const NODES: Node[] = [
       description:
         "Estado y configuración de las alertas. La escribe y lee la Lógica de Alertas de la UI.",
     },
-    style: boxStyle(200, 38),
+    style: boxStyle(200, 38, 252),
   },
   {
     id: "tbl_camp_oss",
@@ -556,7 +563,7 @@ const NODES: Node[] = [
       description:
         "Datos de campañas extraídos desde OSS por las Cloud Functions.",
     },
-    style: boxStyle(200, 40),
+    style: boxStyle(200, 40, 300),
   },
   {
     id: "tbl_camp_plat",
@@ -568,7 +575,7 @@ const NODES: Node[] = [
       description:
         "Métricas de performance por plataforma (Google Ads, Meta, TikTok) consolidadas para la UI.",
     },
-    style: boxStyle(200, 40),
+    style: boxStyle(200, 40, 348),
   },
 
   // Top — Cloud Scheduler (triggers the functions)
@@ -585,7 +592,7 @@ const NODES: Node[] = [
       rationale:
         "Preferimos un cron administrado a uno en una VM siempre encendida: no hay servidor que mantener y se integra de forma nativa con las Cloud Functions. Maneja reintentos y zonas horarias sin código adicional.",
     },
-    style: boxStyle(184, 50),
+    style: boxStyle(184, 50, 74),
   },
 
   // Lane C — Cloud Functions (ordered so each has a clean exit)
@@ -602,7 +609,7 @@ const NODES: Node[] = [
       rationale:
         "Las tareas de extracción son cortas y se ejecutan por evento, así que una función serverless es más eficiente que un servicio siempre activo. Pagamos solo por ejecución y cada función escala de forma independiente según su carga.",
     },
-    style: boxStyle(204, 44),
+    style: boxStyle(204, 44, 198),
   },
   {
     id: "fn_docs",
@@ -617,7 +624,7 @@ const NODES: Node[] = [
       rationale:
         "Las tareas de extracción son cortas y se ejecutan por evento, así que una función serverless es más eficiente que un servicio siempre activo. Pagamos solo por ejecución y cada función escala de forma independiente según su carga.",
     },
-    style: boxStyle(204, 46),
+    style: boxStyle(204, 46, 256),
   },
   {
     id: "fn_perf",
@@ -650,7 +657,7 @@ const NODES: Node[] = [
       rationale:
         "Las tareas de extracción son cortas y se ejecutan por evento, así que una función serverless es más eficiente que un servicio siempre activo. Pagamos solo por ejecución y cada función escala de forma independiente según su carga.",
     },
-    style: boxStyle(204, 56),
+    style: boxStyle(204, 56, 326),
   },
 
   // Lane D — external sources / sinks
@@ -664,7 +671,7 @@ const NODES: Node[] = [
       description:
         "API externa de OSS desde donde se extraen los datos de campañas.",
     },
-    style: boxStyle(130, 50),
+    style: boxStyle(130, 50, 206),
   },
   {
     id: "gcs",
@@ -679,7 +686,7 @@ const NODES: Node[] = [
       rationale:
         "Para archivos y documentos lo elegimos antes que guardarlos en la base: es más barato por GB, escala sin límite y sirve los objetos directamente. Evita inflar Cloud SQL con blobs binarios.",
     },
-    style: boxStyle(156, 50),
+    style: boxStyle(156, 50, 262),
   },
 
   // Lower band — shared services
@@ -697,7 +704,7 @@ const NODES: Node[] = [
       rationale:
         "Centralizamos tokens y credenciales acá en lugar de variables de entorno o archivos en el repo. Ofrece versionado, control de acceso por IAM y auditoría de cada lectura del secreto.",
     },
-    style: boxStyle(158, 64),
+    style: boxStyle(158, 64, 470),
   },
   {
     id: "service_account",
@@ -712,7 +719,7 @@ const NODES: Node[] = [
       rationale:
         "Cada componente usa una Service Account con permisos mínimos en vez de credenciales compartidas. IAM permite acotar exactamente qué puede hacer cada servicio y rotar credenciales sin tocar el código.",
     },
-    style: boxStyle(168, 58),
+    style: boxStyle(168, 58, 474),
   },
 
   // Outputs
@@ -729,7 +736,7 @@ const NODES: Node[] = [
       description:
         "Canales de salida de las alertas: mensajes a Microsoft Teams y correos por Gmail.",
     },
-    style: boxStyle(178, 80),
+    style: boxStyle(178, 80, 450),
   },
   {
     id: "ext_ads",
@@ -761,7 +768,7 @@ const NODES: Node[] = [
         },
       ],
     },
-    style: boxStyle(290, 80),
+    style: boxStyle(290, 80, 560),
   },
 ];
 
@@ -976,49 +983,27 @@ const EDGES: Edge[] = [
   edge("e15", "cloud_scheduler", "bottom-s", "g_fn", "top-t", "uni"),
 ];
 
-const FIT_VIEW_OPTIONS = { padding: 0.12 };
+// Less top padding so the diagram sits higher in the canvas on first load.
+const FIT_VIEW_OPTIONS = {
+  padding: { top: 0.04, bottom: 0.14, left: 0.12, right: 0.12 },
+};
 
-// Tight bounds around the actual diagram content. Large padding in translateExtent
-// becomes visible empty space when zoomed in (a solid band at the edges).
-// Horizontal padding is wider than vertical so there's extra room to pan sideways
-// without exposing an empty band above/below the content.
+// Used only to decide when vertical wheel gestures should pan vs scroll the page.
 const CONTENT_BOUNDS = getNodesBounds(NODES);
-const EXTENT_PADDING_X = 220;
-const EXTENT_PADDING_Y = 8;
-const TRANSLATE_EXTENT: [[number, number], [number, number]] = [
-  [CONTENT_BOUNDS.x - EXTENT_PADDING_X, CONTENT_BOUNDS.y - EXTENT_PADDING_Y],
-  [
-    CONTENT_BOUNDS.x + CONTENT_BOUNDS.width + EXTENT_PADDING_X,
-    CONTENT_BOUNDS.y + CONTENT_BOUNDS.height + EXTENT_PADDING_Y,
-  ],
-];
 
-// Clamp viewport translation so content edges align with the canvas at any zoom.
-// Mirrors React Flow / d3-zoom constrain math used by translateExtent.
-function clampViewportTranslation(
-  vp: { x: number; y: number; zoom: number },
-  width: number,
-  height: number,
-): { x: number; y: number } {
-  const k = vp.zoom;
-  const [minFlowX, minFlowY] = TRANSLATE_EXTENT[0];
-  const [maxFlowX, maxFlowY] = TRANSLATE_EXTENT[1];
-
-  const maxX = -minFlowX * k;
-  const minX = width - maxFlowX * k;
-  const maxY = -minFlowY * k;
-  const minY = height - maxFlowY * k;
-
+function verticalPanLimits(zoom: number, height: number) {
+  const k = zoom;
   return {
-    x: minX > maxX ? (minX + maxX) / 2 : Math.min(maxX, Math.max(minX, vp.x)),
-    y: minY > maxY ? (minY + maxY) / 2 : Math.min(maxY, Math.max(minY, vp.y)),
+    maxY: -CONTENT_BOUNDS.y * k,
+    minY: height - (CONTENT_BOUNDS.y + CONTENT_BOUNDS.height) * k,
   };
 }
 
 function DiagramInner() {
   const [nodes, , onNodesChange] = useNodesState(NODES);
   const [edges] = useEdgesState(EDGES);
-  const { setNodes, fitView, getViewport, setViewport } = useReactFlow();
+  const { setNodes, fitView, getViewport } = useReactFlow();
+  const store = useStoreApi();
   const canvasRef = useRef<HTMLDivElement>(null);
 
   // Hovered node id: drives the highlight/dim effect on nodes and edges.
@@ -1043,23 +1028,6 @@ function DiagramInner() {
   );
   const handleNodeMouseLeave = useCallback(() => setHoveredId(null), []);
 
-  // Re-clamp after drag-pan or zoom so the viewport never rests on empty padding.
-  const centerViewport = useCallback(() => {
-    const el = canvasRef.current;
-    if (!el) return;
-    const vp = getViewport();
-    const { width, height } = el.getBoundingClientRect();
-    const next = clampViewportTranslation(vp, width, height);
-    if (next.x !== vp.x || next.y !== vp.y) {
-      setViewport({ ...vp, ...next });
-    }
-  }, [getViewport, setViewport]);
-
-  const handleMoveEnd = useCallback(() => {
-    if (hasSelection) return;
-    centerViewport();
-  }, [hasSelection, centerViewport]);
-
   // Wheel/trackpad handling. Horizontal gestures (or Shift + wheel) pan sideways.
   // Vertical gestures pan the diagram down/up while it overflows the canvas (i.e.
   // when zoomed in and there's clipped content), and only hand the scroll back to
@@ -1071,61 +1039,40 @@ function DiagramInner() {
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       if (hasSelection) return;
-      const vp = getViewport();
-      const { width, height } = el.getBoundingClientRect();
+      // Pinch-to-zoom and Ctrl/Cmd + wheel are handled by React Flow.
+      if (e.ctrlKey || e.metaKey) return;
+
+      const { panBy, width, height, transform } = store.getState();
+      if (!width || !height) return;
+
       const horizontal = e.shiftKey ? e.deltaY : e.deltaX;
       const vertical = e.shiftKey ? 0 : e.deltaY;
 
       if (Math.abs(horizontal) > Math.abs(vertical)) {
         e.preventDefault();
-        const next = clampViewportTranslation(
-          { ...vp, x: vp.x - horizontal },
-          width,
-          height,
-        );
-        setViewport({ ...vp, ...next });
+        void panBy({ x: -horizontal, y: 0 });
         return;
       }
 
-      // Vertical gesture: pan the diagram only while it overflows vertically and
-      // hasn't reached the edge yet; otherwise let the page scroll as usual.
-      const k = vp.zoom;
-      const minY = height - TRANSLATE_EXTENT[1][1] * k;
-      const maxY = -TRANSLATE_EXTENT[0][1] * k;
-      if (minY >= maxY) return; // content fits vertically -> page scrolls
+      const k = transform[2];
+      if (CONTENT_BOUNDS.height * k <= height) return;
+
+      const vp = getViewport();
+      const { minY, maxY } = verticalPanLimits(k, height);
+      if (minY >= maxY) return;
       const nextY = Math.min(maxY, Math.max(minY, vp.y - vertical));
-      if (nextY === vp.y) return; // at top/bottom edge -> page scrolls
+      if (nextY === vp.y) return;
       e.preventDefault();
-      setViewport({ ...vp, y: nextY });
+      void panBy({ x: 0, y: -vertical });
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [hasSelection, getViewport, setViewport]);
+  }, [hasSelection, getViewport, store]);
 
-  // Keep the diagram centered when the canvas grows on wide screens.
-  useEffect(() => {
-    const el = canvasRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(() => {
-      if (hasSelection) return;
-      centerViewport();
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [centerViewport, hasSelection]);
-
-  // Reset clears any open popup (node selection) and returns the viewport
-  // to its initial fitted state.
   const handleReset = useCallback(() => {
     setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
-    fitView({ ...FIT_VIEW_OPTIONS, duration: 400 });
-    window.setTimeout(centerViewport, 420);
-  }, [setNodes, fitView, centerViewport]);
-
-  const handleInit = useCallback(() => {
-    fitView(FIT_VIEW_OPTIONS);
-    requestAnimationFrame(centerViewport);
-  }, [fitView, centerViewport]);
+    void fitView({ ...FIT_VIEW_OPTIONS, duration: 400 });
+  }, [setNodes, fitView]);
 
   // Selection is fully controlled here (React Flow's built-in selection is
   // disabled via elementsSelectable) so that, while a popup is open, the first
@@ -1174,7 +1121,7 @@ function DiagramInner() {
     | undefined;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {/* Header: interaction hint + reset action (section title now lives in the navbar) */}
       <div className="flex items-center justify-between gap-6">
         <p className="max-w-2xl text-sm text-foreground/50 leading-relaxed">
@@ -1212,13 +1159,10 @@ function DiagramInner() {
             onNodeMouseEnter={handleNodeMouseEnter}
             onNodeMouseLeave={handleNodeMouseLeave}
             onPaneClick={handlePaneClick}
-            onMoveEnd={handleMoveEnd}
-            onInit={handleInit}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             fitView
             fitViewOptions={FIT_VIEW_OPTIONS}
-            translateExtent={TRANSLATE_EXTENT}
             minZoom={0.3}
             maxZoom={2}
             nodesDraggable={false}
@@ -1236,7 +1180,13 @@ function DiagramInner() {
             zoomOnDoubleClick={!hasSelection}
             proOptions={{ hideAttribution: true }}
           >
-            <Background variant={BackgroundVariant.Dots} gap={22} size={1.5} color="var(--brand-subtle)" />
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={22}
+              size={1.5}
+              color="var(--brand-subtle)"
+              bgColor="var(--app-background)"
+            />
           </ReactFlow>
         </HoverContext.Provider>
         {/* Centered popup overlay. The wrapper ignores pointer events so a click

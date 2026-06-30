@@ -89,30 +89,44 @@ export function RoadmapInteractive({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const scopeRef = useRef<HTMLDivElement>(null);
 
-  // Forward horizontal wheel gestures made anywhere on the page to the gantt's
-  // scroll container, so the chart pans even when the pointer is outside its box.
+  // Forward wheel gestures outside the chart box to the gantt scroller on both
+  // axes. The page uses ScrollLock, so scrolling over the legend or padding
+  // must still pan the chart vertically and/or horizontally as appropriate.
   useEffect(() => {
     function onWheel(event: WheelEvent) {
-      if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) {
-        return;
-      }
+      if (selected) return;
+
       const scroller = scopeRef.current?.querySelector<HTMLElement>(
         "[data-roadmap-scroll]",
       );
-      if (!scroller) {
-        return;
-      }
-      // Let the box handle the gesture natively when the pointer is over it.
+      if (!scroller) return;
+
+      // Native overflow scroll when the pointer is over the chart container.
       if (event.target instanceof Node && scroller.contains(event.target)) {
         return;
       }
-      scroller.scrollLeft += event.deltaX;
-      event.preventDefault();
+
+      const deltaX = event.shiftKey ? event.deltaY : event.deltaX;
+      const deltaY = event.shiftKey ? 0 : event.deltaY;
+      if (deltaX === 0 && deltaY === 0) return;
+
+      const prevLeft = scroller.scrollLeft;
+      const prevTop = scroller.scrollTop;
+      scroller.scrollLeft += deltaX;
+      scroller.scrollTop += deltaY;
+
+      if (
+        scroller.scrollLeft !== prevLeft ||
+        scroller.scrollTop !== prevTop
+      ) {
+        event.preventDefault();
+      }
     }
 
-    window.addEventListener("wheel", onWheel, { passive: false });
-    return () => window.removeEventListener("wheel", onWheel);
-  }, []);
+    window.addEventListener("wheel", onWheel, { passive: false, capture: true });
+    return () =>
+      window.removeEventListener("wheel", onWheel, { capture: true });
+  }, [selected]);
 
   // On mount, scroll the chart so the "today" marker sits in the middle of the
   // visible area instead of starting pinned to the left edge.

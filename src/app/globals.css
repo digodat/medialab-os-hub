@@ -222,6 +222,13 @@
 /* Architecture diagram: strip React Flow's default group-node chrome.
    We render a fully custom (dashed) group box, so the library's default
    solid border/background/padding only shows up as an unwanted frame. */
+.arch-flow {
+  background-color: var(--app-background);
+}
+.arch-flow .react-flow__renderer,
+.arch-flow .react-flow__pane {
+  background-color: var(--app-background);
+}
 .arch-flow .react-flow__node-group {
   border: none;
   background: transparent;
