@@ -1,3 +1,7 @@
+"use client";
+
+import { useLayoutEffect, useRef, useState } from "react";
+
 import {
   RoadmapBars,
   RoadmapConnectors,
@@ -22,18 +26,29 @@ import {
 } from "@/lib/roadmap/roadmap-data";
 
 // Vertical layout constants in px. Horizontal positioning uses percentages so
-// the chart stretches to fill its container width, while MONTH_MIN_W gives the
+// the chart stretches to fill its container width, while WEEK_MIN_W gives the
 // timeline a minimum width so it can overflow (and be scrolled) inside the box.
-// Dependency connectors are computed deterministically server-side: the path is
-// drawn in a scalable SVG (viewBox month-units on X, px on Y) and the arrowhead
-// is a separate CSS triangle so it never distorts under non-uniform scaling.
+// Row height adapts to the box height so swimlanes fill the viewport without a
+// blank band at the bottom. Dependency connectors use week-units on X and px on Y.
 const HEADER_H = 56;
-const ROW_H = 40;
-const GROUP_PAD = 14;
+const MIN_ROW_H = 48;
+const MAX_ROW_H = 80;
+const GROUP_PAD = 20;
 const SIDEBAR_W = 212;
 const WEEK_MIN_W = 136;
 // Horizontal control-handle length for dependency curves, in week units.
 const CURVE = 1.2;
+
+const TOTAL_LANE_COUNT = ROADMAP_GROUPS.reduce((total, group) => {
+  const groupEpics = ROADMAP_EPICS.filter((epic) => epic.group === group.id);
+  return total + Math.max(packLanes(groupEpics).laneCount, 1);
+}, 0);
+
+function computeRowHeight(bodyHeight: number): number {
+  const padding = ROADMAP_GROUPS.length * GROUP_PAD * 2;
+  const rowH = Math.floor((bodyHeight - padding) / TOTAL_LANE_COUNT);
+  return Math.max(MIN_ROW_H, Math.min(MAX_ROW_H, rowH));
+}
 
 type PositionedEpic = {
   epic: RoadmapEpic;
@@ -51,7 +66,7 @@ type PositionedGroup = {
 
 type EpicAnchor = { startWeek: number; endWeek: number; centerY: number };
 
-function buildLayout(totalWeeks: number) {
+function buildLayout(totalWeeks: number, rowH: number) {
   const pct = (weeks: number) => (weeks / totalWeeks) * 100;
   const groups: PositionedGroup[] = [];
   const byId = new Map<string, EpicAnchor>();
@@ -60,11 +75,11 @@ function buildLayout(totalWeeks: number) {
   for (const group of ROADMAP_GROUPS) {
     const groupEpics = ROADMAP_EPICS.filter((epic) => epic.group === group.id);
     const { laneOf, laneCount } = packLanes(groupEpics);
-    const height = GROUP_PAD * 2 + Math.max(laneCount, 1) * ROW_H;
+    const height = GROUP_PAD * 2 + Math.max(laneCount, 1) * rowH;
 
     const positioned: PositionedEpic[] = groupEpics.map((epic) => {
       const lane = laneOf.get(epic.id) ?? 0;
-      const centerY = cursorY + GROUP_PAD + lane * ROW_H + ROW_H / 2;
+      const centerY = cursorY + GROUP_PAD + lane * rowH + rowH / 2;
       byId.set(epic.id, {
         startWeek: epic.startWeek,
         endWeek: epic.endWeek,
@@ -86,10 +101,35 @@ function buildLayout(totalWeeks: number) {
 }
 
 export function RoadmapGantt() {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [rowH, setRowH] = useState(MIN_ROW_H);
+
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    if (!box) {
+      return;
+    }
+
+    function updateRowHeight() {
+      const scroller = boxRef.current?.querySelector<HTMLElement>(
+        "[data-roadmap-scroll]",
+      );
+      if (!scroller) {
+        return;
+      }
+      setRowH(computeRowHeight(scroller.clientHeight - HEADER_H));
+    }
+
+    updateRowHeight();
+    const observer = new ResizeObserver(updateRowHeight);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, []);
+
   const timeline = buildTimeline();
   const { totalWeeks } = timeline;
   const pct = (weeks: number) => (weeks / totalWeeks) * 100;
-  const { groups, byId, totalHeight } = buildLayout(totalWeeks);
+  const { groups, byId, totalHeight } = buildLayout(totalWeeks, rowH);
 
   const todayOffset = weekOffsetOf(new Date(), totalWeeks);
   const minGridWidth = SIDEBAR_W + totalWeeks * WEEK_MIN_W;
@@ -186,7 +226,10 @@ export function RoadmapGantt() {
 
       {/* The box is a fixed window: scrolling moves the chart inside it. The
           header row and sidebar column stay pinned via position: sticky. */}
-      <div className="roadmap-box min-h-0 flex-1 overflow-hidden rounded-2xl border border-foreground/10 bg-white/45 backdrop-blur-sm">
+      <div
+        ref={boxRef}
+        className="roadmap-box min-h-0 flex-1 overflow-hidden rounded-2xl border border-foreground/10 bg-white/45 backdrop-blur-sm"
+      >
         <div className="h-full w-full overflow-auto" data-roadmap-scroll>
           <div
             className="grid"

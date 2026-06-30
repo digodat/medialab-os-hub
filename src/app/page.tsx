@@ -80,18 +80,17 @@ const CAPABILITIES = [
 ];
 
 const SECURITY_POINTS = [
-  "Las campañas siempre se crean en pausa: la inversión se activa de forma manual.",
-  "Credenciales y tokens viven en Secret Manager, nunca en el código ni en el navegador.",
-  "Cada componente opera con permisos mínimos mediante Service Accounts dedicadas.",
-  "Las operaciones sensibles se validan antes de ejecutarse contra las plataformas.",
+  "Secretos y credenciales centralizados: ningún token vive en el código ni llega al navegador.",
+  "Mínimo privilegio por diseño: cada componente opera con identidades dedicadas y permisos acotados.",
+  "Validación previa a la ejecución: las operaciones sensibles se verifican antes de impactar las plataformas.",
+  "Acceso corporativo unificado: identidad centralizada vía SSO, alineada con el resto de las aplicaciones de Falabella.",
 ];
 
 const ROADMAP_POINTS = [
-  "Migración de la base de datos a Cloud SQL (PostgreSQL).",
-  "Acceso corporativo con SSO y roles por usuario.",
-  "Módulo de logs de actividad para auditoría completa.",
-  "Alertas e integraciones nativas (Meta, TikTok y DV 360) consolidadas.",
-  "Auditoría de seguridad y ethical hacking a cargo de Falabella.",
+  "Automatización end-to-end del flujo operativo, con validaciones agenticas que reducen la intervención manual en cada paso.",
+  "Modelos de machine learning que detectan desvíos de performance de forma temprana, antes de que impacten resultados.",
+  "Operación autónoma con despliegues automatizados y optimización agentica: agentes que deciden y ejecutan bajo reglas de negocio y controles de gobernanza.",
+  "Integración profunda con el way of work de Falabella: procesos, roles y herramientas del equipo en un ecosistema unificado.",
 ];
 
 export default function HomePage() {
@@ -250,12 +249,12 @@ export default function HomePage() {
             ))}
           </div>
 
-          <figure className="mt-12 overflow-hidden rounded-xl border-2 border-foreground/20 bg-white shadow-sm shadow-foreground/5">
+          <figure className="mt-12 overflow-hidden rounded-xl border-2 border-brand/70 bg-white shadow-sm shadow-foreground/5">
             <Image
-              src="/landing/oss-campaigns-screen.png"
+              src="/landing/screen4.png"
               alt="Captura de pantalla de MediaLab OS con la vista de campañas OSS"
-              width={3006}
-              height={1616}
+              width={2994}
+              height={1624}
               className="h-auto w-full"
               sizes="(max-width: 1440px) 100vw, 1440px"
             />
@@ -264,14 +263,14 @@ export default function HomePage() {
 
         {/* Security + Roadmap */}
         <div className="mt-20 grid gap-6 lg:grid-cols-2">
-          <div className="flex flex-col rounded-2xl border border-foreground/10 bg-white/40 p-6 shadow-sm backdrop-blur-sm">
+          <div className="flex h-full flex-col rounded-2xl border border-foreground/10 bg-white/40 p-6 shadow-sm backdrop-blur-sm">
             <div className="flex items-center gap-2.5">
               <ShieldCheckIcon className="h-5 w-5 text-brand" />
               <h3 className="font-heading text-xl font-semibold tracking-tight text-foreground">
                 Seguridad por diseño
               </h3>
             </div>
-            <ul className="mt-5 space-y-3">
+            <ul className="mt-5 flex-1 space-y-3">
               {SECURITY_POINTS.map((point) => (
                 <li
                   key={point}
@@ -291,14 +290,14 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="flex flex-col rounded-2xl border border-foreground/10 bg-white/40 p-6 shadow-sm backdrop-blur-sm">
+          <div className="flex h-full flex-col rounded-2xl border border-foreground/10 bg-white/40 p-6 shadow-sm backdrop-blur-sm">
             <div className="flex items-center gap-2.5">
               <Bars3BottomLeftIcon className="h-5 w-5 text-brand" />
               <h3 className="font-heading text-xl font-semibold tracking-tight text-foreground">
                 Hacia dónde va
               </h3>
             </div>
-            <ul className="mt-5 space-y-3">
+            <ul className="mt-5 flex-1 space-y-3">
               {ROADMAP_POINTS.map((point) => (
                 <li
                   key={point}

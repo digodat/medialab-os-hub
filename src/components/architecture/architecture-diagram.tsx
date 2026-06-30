@@ -1044,8 +1044,7 @@ function DiagramInner() {
   const handleNodeMouseLeave = useCallback(() => setHoveredId(null), []);
 
   // Re-clamp after drag-pan or zoom so the viewport never rests on empty padding.
-  const handleMoveEnd = useCallback(() => {
-    if (hasSelection) return;
+  const centerViewport = useCallback(() => {
     const el = canvasRef.current;
     if (!el) return;
     const vp = getViewport();
@@ -1054,7 +1053,12 @@ function DiagramInner() {
     if (next.x !== vp.x || next.y !== vp.y) {
       setViewport({ ...vp, ...next });
     }
-  }, [hasSelection, getViewport, setViewport]);
+  }, [getViewport, setViewport]);
+
+  const handleMoveEnd = useCallback(() => {
+    if (hasSelection) return;
+    centerViewport();
+  }, [hasSelection, centerViewport]);
 
   // Wheel/trackpad handling. Horizontal gestures (or Shift + wheel) pan sideways.
   // Vertical gestures pan the diagram down/up while it overflows the canvas (i.e.
@@ -1098,12 +1102,30 @@ function DiagramInner() {
     return () => el.removeEventListener("wheel", onWheel);
   }, [hasSelection, getViewport, setViewport]);
 
+  // Keep the diagram centered when the canvas grows on wide screens.
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      if (hasSelection) return;
+      centerViewport();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [centerViewport, hasSelection]);
+
   // Reset clears any open popup (node selection) and returns the viewport
   // to its initial fitted state.
   const handleReset = useCallback(() => {
     setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
     fitView({ ...FIT_VIEW_OPTIONS, duration: 400 });
-  }, [setNodes, fitView]);
+    window.setTimeout(centerViewport, 420);
+  }, [setNodes, fitView, centerViewport]);
+
+  const handleInit = useCallback(() => {
+    fitView(FIT_VIEW_OPTIONS);
+    requestAnimationFrame(centerViewport);
+  }, [fitView, centerViewport]);
 
   // Selection is fully controlled here (React Flow's built-in selection is
   // disabled via elementsSelectable) so that, while a popup is open, the first
@@ -1174,13 +1196,10 @@ function DiagramInner() {
         </button>
       </div>
 
-      {/* Canvas — full-bleed to the window width. The (hub) layout caps content
-          at 80% width and centers it, so we offset by 12.5% of that container on
-          each side (= 10% of the viewport) to span the full window width without
-          relying on 100vw (which would overflow past the reserved scrollbar gutter). */}
+      {/* Canvas — full-bleed to the viewport width from the centered 80% column. */}
       <div
         ref={canvasRef}
-        className="relative h-[680px] -mx-[12.5%] overflow-hidden bg-[var(--app-background)]"
+        className="relative h-[680px] w-screen max-w-[100vw] ml-[calc(50%-50vw)] overflow-hidden bg-[var(--app-background)]"
       >
         <EdgeMarkerDefs />
         <HoverContext.Provider value={hoveredId}>
@@ -1194,6 +1213,7 @@ function DiagramInner() {
             onNodeMouseLeave={handleNodeMouseLeave}
             onPaneClick={handlePaneClick}
             onMoveEnd={handleMoveEnd}
+            onInit={handleInit}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             fitView
