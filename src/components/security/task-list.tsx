@@ -958,7 +958,7 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
                                                 />
                                               </span>
                                             </div>
-                                            <p className="mt-1.5 text-xs leading-relaxed text-foreground/65">
+                                            <p className="mt-1.5 whitespace-pre-line text-xs leading-relaxed text-foreground/65">
                                               <HighlightText
                                                 text={entry.reason}
                                                 regex={highlightRegex}
