@@ -69,31 +69,32 @@ export default function KnowledgePage() {
 
         <div className="space-y-6 pt-6">
           <p className="max-w-2xl text-base leading-relaxed text-foreground/65">
-            Cuando una campaña se desvía de lo esperado —inactividad, agotamiento
-            de presupuesto o pausas involuntarias— la plataforma avisa al equipo
-            por dos canales. Así se ven esas notificaciones.
+            MediaLab OS centraliza resultados y alerta cuando detecta desvíos:
+            inactividad, subejecución de presupuesto o diferencias contra el
+            plan. El aviso llega por Teams y por correo. Abajo, un ejemplo de
+            alerta de inactividad en cada canal.
           </p>
 
           <div className="grid gap-8 lg:grid-cols-2">
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground/70">
                 <ChatBubbleLeftRightIcon className="h-4 w-4" />
-                Notificación por Teams
+                Teams
               </div>
               <TeamsAlertMockup />
             </div>
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground/70">
                 <EnvelopeIcon className="h-4 w-4" />
-                Notificación por correo
+                Correo
               </div>
               <EmailAlertMockup />
             </div>
           </div>
 
           <p className="text-sm leading-relaxed text-foreground/45">
-            Los datos mostrados son de ejemplo. El diseño final de cada alerta
-            puede ajustarse según el canal y el tipo de evento.
+            Datos de ejemplo. El contenido varía según el canal y el tipo de
+            alerta.
           </p>
         </div>
       </details>

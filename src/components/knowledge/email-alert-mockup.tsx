@@ -44,16 +44,16 @@ export function EmailAlertMockup() {
 
         {/* Subject */}
         <h4 className="mt-4 text-base font-semibold tracking-tight text-foreground">
-          [Alerta · Alta] Inactividad detectada — Google Ads / Chile
+          [Alta] Inactividad — Google Ads / Chile
         </h4>
 
         {/* Body */}
         <div className="mt-3 space-y-3 text-sm leading-relaxed text-foreground/70">
           <p>Hola equipo,</p>
           <p>
-            Una campaña activa dejó de registrar entregas en las últimas horas.
-            Te recomendamos revisar su estado para descartar un problema de
-            configuración, agotamiento de presupuesto o pausa involuntaria.
+            Una campaña activa dejó de registrar entregas. Revisá su estado para
+            descartar un problema de configuración, presupuesto o pausa no
+            intencional.
           </p>
         </div>
 
@@ -86,8 +86,7 @@ export function EmailAlertMockup() {
 
         {/* Footer */}
         <p className="mt-5 border-t border-foreground/10 pt-4 text-xs leading-relaxed text-foreground/40">
-          Este es un mensaje automático de monitoreo de MediaLab OS. No
-          respondas a este correo.
+          Mensaje automático de MediaLab OS. No responder.
         </p>
       </div>
     </div>

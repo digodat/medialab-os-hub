@@ -34,25 +34,25 @@ const STEPS = [
     title: "Planificación",
     body: (
       <>
-        Las estrategias de medios se definen y aprueban en <OssTerm />, el
-        sistema de planificación de Falabella.
+        En <OssTerm /> el equipo define y aprueba las estrategias de medios de
+        cada campaña.
       </>
     ),
   },
   {
     Icon: CircleStackIcon,
     title: "Ingesta de datos",
-    body: "Procesos automáticos extraen y consolidan las campañas y su performance en una base de datos central.",
+    body: "Jobs programados extraen campañas y resultados de performance a MediaLab OS. Con esos datos, la plataforma predice antes del despliegue si alguna campaña podría desviarse de lo planificado.",
   },
   {
     Icon: PaperAirplaneIcon,
     title: "Despliegue",
-    body: `El operador completa un formulario y la app crea las campañas en ${MEDIA_PLATFORMS}, paso a paso y de forma auditable.`,
+    body: `El operador completa un formulario; la app crea las campañas en ${MEDIA_PLATFORMS} y registra cada paso.`,
   },
   {
     Icon: BellAlertIcon,
     title: "Monitoreo",
-    body: "La performance se consolida en un solo lugar y las alertas avisan por Teams y Gmail ante desvíos o inactividad.",
+    body: "Resultados y alertas viven en un solo panel. Si hay desvío o inactividad, el equipo recibe aviso por Teams y Gmail.",
   },
 ];
 
@@ -60,37 +60,37 @@ const CAPABILITIES = [
   {
     Icon: BoltIcon,
     title: "Velocidad operativa",
-    body: `Lo que antes implicaba configurar campaña por campaña en ${MEDIA_PLATFORMS} ahora se dispara desde un único flujo guiado.`,
+    body: `Un formulario reemplaza configurar campaña por campaña en ${MEDIA_PLATFORMS}.`,
   },
   {
     Icon: GlobeAltIcon,
     title: "Escala regional",
-    body: "Una misma operación cubre los tres mercados, respetando las cuentas y la nomenclatura de cada país.",
+    body: "Chile, Colombia y Perú desde la misma operación, con la cuenta y nomenclatura de cada país.",
   },
   {
     Icon: CheckBadgeIcon,
     title: "Consistencia",
-    body: "La configuración y la nomenclatura estandarizadas reducen los errores manuales y el retrabajo.",
+    body: "La misma configuración y nomenclatura en cada envío corta errores de tipeo y retrabajo.",
   },
   {
     Icon: ShieldCheckIcon,
     title: "Gobernanza",
-    body: "Cada acción queda registrada y toda campaña nace en pausa, bajo control humano antes de invertir.",
+    body: "Cada acción queda registrada. Las campañas nacen en pausa y, antes del despliegue, el equipo ve si alguna podría desviarse de lo planificado.",
   },
 ];
 
 const SECURITY_POINTS = [
-  "Secretos y credenciales centralizados: ningún token vive en el código ni llega al navegador.",
-  "Mínimo privilegio por diseño: cada componente opera con identidades dedicadas y permisos acotados.",
-  "Validación previa a la ejecución: las operaciones sensibles se verifican antes de impactar las plataformas.",
-  "Acceso corporativo unificado: identidad centralizada vía SSO, alineada con el resto de las aplicaciones de Falabella.",
+  "Tokens y credenciales viven en servicios seguros: no se guardan en el código ni llegan al navegador.",
+  "Cada componente usa una identidad propia con los permisos mínimos para operar.",
+  "MediaLab OS valida datos y acciones sensibles antes de tocar las plataformas.",
+  "El acceso entra por SSO corporativo, igual que el resto de aplicaciones de Falabella.",
 ];
 
 const ROADMAP_POINTS = [
-  "Automatización end-to-end del flujo operativo, con validaciones agenticas que reducen la intervención manual en cada paso.",
-  "Modelos de machine learning que detectan desvíos de performance de forma temprana, antes de que impacten resultados.",
-  "Operación autónoma con despliegues automatizados y optimización agentica: agentes que deciden y ejecutan bajo reglas de negocio y controles de gobernanza.",
-  "Integración profunda con el way of work de Falabella: procesos, roles y herramientas del equipo en un ecosistema unificado.",
+  "Validaciones agénticas que revisan cada paso y reducen trabajo manual antes del envío.",
+  "Modelos predictivos que marcan desvíos de performance antes de que afecten la campaña.",
+  "Agentes que despliegan y optimizan campañas bajo reglas de negocio y controles de gobernanza.",
+  "Integración con los procesos, roles y herramientas que el equipo de Falabella ya usa.",
 ];
 
 export default function HomePage() {
@@ -181,18 +181,15 @@ export default function HomePage() {
           <div className="min-w-0 space-y-5">
             <p className="text-base leading-relaxed text-foreground/75 first-letter:float-left first-letter:mr-2 first-letter:font-heading first-letter:text-6xl first-letter:leading-[0.8] first-letter:text-brand">
               MediaLab OS es la herramienta interna que automatiza el despliegue de
-              campañas publicitarias de Falabella en {MEDIA_PLATFORMS}.
-              Toma las estrategias ya planificadas en <OssTerm /> y le permite al equipo de
-              medios lanzarlas en las cuatro plataformas —y en los tres mercados de
-              la región— desde un único flujo guiado, sin saltar entre cuentas ni
-              configurar cada campaña a mano.
+              campañas publicitarias de Falabella en {MEDIA_PLATFORMS}. Parte de
+              estrategias ya aprobadas en <OssTerm />: el equipo de medios las publica
+              en las cuatro plataformas y en Chile, Colombia y Perú desde un solo
+              flujo, sin cambiar de cuenta ni configurar cada campaña a mano.
             </p>
             <p className="text-base leading-relaxed text-foreground/65">
-              El objetivo es simple: convertir un proceso manual, repetitivo y
-              propenso a errores en una operación rápida, consistente y trazable.
-              Cada envío queda registrado y, por diseño, las campañas siempre se
-              crean en pausa: ninguna inversión se activa sin una validación humana
-              de por medio.
+              Hoy el proceso es manual y repetitivo. MediaLab OS lo acorta, lo
+              estandariza y registra cada envío. Las campañas nacen en pausa; la
+              inversión se activa solo después de una revisión humana.
             </p>
           </div>
 
@@ -211,7 +208,7 @@ export default function HomePage() {
               <li key={step.title} className="relative p-5">
                 <div className="flex items-center justify-between">
                   <step.Icon className="h-6 w-6 text-brand" />
-                  <span className="font-heading text-sm font-semibold text-foreground/25">
+                  <span className="font-heading text-2xl font-semibold text-foreground/25">
                     0{index + 1}
                   </span>
                 </div>

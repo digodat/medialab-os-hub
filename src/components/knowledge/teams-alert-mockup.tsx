@@ -38,9 +38,8 @@ export function TeamsAlertMockup() {
             </h4>
 
             <p className="mt-1.5 text-sm leading-relaxed text-foreground/70">
-              Una campaña activa dejó de registrar entregas. Revisá su estado en
-              la plataforma para descartar un problema de configuración o
-              presupuesto.
+              Esta campaña lleva sin entregas. Revisá configuración y presupuesto
+              en MediaLab OS o en la plataforma de origen.
             </p>
 
             {/* Facts */}
