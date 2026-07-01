@@ -56,6 +56,9 @@ const SEVERITY_ORDER: Severity[] = ["CRÍTICO", "ALTO", "MEDIO", "BAJO", "OK"];
 
 const STATUS_ORDER: TaskStatus[] = STATUS_OPTIONS.map((option) => option.value);
 
+// Counted as resolved in the progress bar (closed findings, with or without action).
+const RESOLVED_STATUSES = new Set<TaskStatus>(["Finalizada", "No Aplica"]);
+
 const STATUS_STYLES: Record<TaskStatus, { bg: string; text: string; dot: string }> =
   Object.fromEntries(
     STATUS_OPTIONS.map((option) => [
@@ -350,21 +353,20 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
     }));
   }, [findings, records]);
 
-  // Progress = finished tasks over the full set of findings (including "No
-  // Aplica" in the denominator).
+  // Progress = resolved tasks (Finalizada + No Aplica) over the full catalog.
   const progress = useMemo(() => {
     const total = findings.length;
-    let finalizadas = 0;
+    let resueltas = 0;
 
     for (const finding of findings) {
-      if (getRecordStatus(finding, records) === "Finalizada") {
-        finalizadas += 1;
+      if (RESOLVED_STATUSES.has(getRecordStatus(finding, records))) {
+        resueltas += 1;
       }
     }
 
-    const percent = total === 0 ? 0 : Math.round((finalizadas / total) * 100);
+    const percent = total === 0 ? 0 : Math.round((resueltas / total) * 100);
 
-    return { finalizadas, total, percent };
+    return { resueltas, total, percent };
   }, [findings, records]);
 
   const toggleSeverity = (severity: Severity) => {
@@ -666,9 +668,9 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
             </span>
             <span className="font-mono text-xs text-foreground/55">
               <span className="font-bold text-foreground">
-                {progress.finalizadas}/{progress.total}
+                {progress.resueltas}/{progress.total}
               </span>{" "}
-              finalizadas
+              resueltas
               <span className="ml-2 text-foreground/40">{progress.percent}%</span>
             </span>
           </div>
@@ -677,8 +679,8 @@ export function TaskList({ findings, initialRecords }: TaskListProps) {
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={progress.total}
-            aria-valuenow={progress.finalizadas}
-            aria-label="Tareas finalizadas"
+            aria-valuenow={progress.resueltas}
+            aria-label="Tareas resueltas"
           >
             <div
               className="h-full rounded-full bg-teal-500 transition-[width] duration-500 ease-out"
